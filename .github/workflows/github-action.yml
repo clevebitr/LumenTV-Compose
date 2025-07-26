@@ -22,7 +22,7 @@ jobs:
       - run: ls
       - run: ./gradlew packageReleaseDistributionForCurrentOS
       - run: ./gradlew createReleaseDistributable
-      - run: tree /f ./composeApp/build  # 添加这行检查实际路径
+      - run: tree /f ./composeApp/build
       - run: ls && tree ./desktopApp /f
       - name: compress
         shell: pwsh
