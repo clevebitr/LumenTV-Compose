@@ -7,6 +7,7 @@ import com.corner.bean.HotData
 import com.corner.catvod.enum.bean.Site
 import com.corner.catvod.enum.bean.Vod
 import com.corner.catvodcore.loader.JarLoader
+import com.corner.util.BrowserUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -17,10 +18,12 @@ object GlobalAppState {
     private val log = LoggerFactory.getLogger(GlobalAppState::class.java)
 
     // State Flows (保持不变)
-    val showProgress = MutableStateFlow(false)
+    var showProgress = MutableStateFlow(false)
     val hotList = MutableStateFlow(listOf<HotData>())
     val chooseVod = mutableStateOf<Vod>(Vod())
+
     val home = MutableStateFlow<Site>(Site.get("", ""))
+
     val clear = MutableStateFlow(false)
     val closeApp = MutableStateFlow(false)
     val videoFullScreen = MutableStateFlow(false)
@@ -75,7 +78,10 @@ object GlobalAppState {
                 // 3. 清理JarLoader
                 JarLoader.clear()
 
-                // 4. 重置状态
+                // 4. 关闭websocket服务
+                BrowserUtils.cleanup()
+
+                // 5. 重置状态
                 resetAllStates()
 
                 log.info("清理操作执行成功！")
@@ -114,7 +120,7 @@ object GlobalAppState {
     fun isShowProgress(): Boolean = showProgress.value
 
     private fun resetAllStates() {
-        showProgress.value = false
+        showProgress = MutableStateFlow(false)
         hotList.value = emptyList()
         home.value = Site.get("", "")
         clear.value = false
