@@ -22,10 +22,11 @@ jobs:
       - run: ls
       - run: ./gradlew packageReleaseDistributionForCurrentOS
       - run: ./gradlew createReleaseDistributable
+      - run: tree /f ./composeApp/build  # 添加这行检查实际路径
       - run: ls && tree ./desktopApp /f
       - name: compress
         shell: pwsh
-        run: Compress-Archive -Path "./composeApp/build/compose/binaries/main-release/app/TV" -DestinationPath ./TV-win-${{ needs.set-tag.outputs.tag }}.zip
+        run: Compress-Archive -Path "./composeApp/build/compose/binaries/main-release/app/TV" -DestinationPath ./LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip
       - name: move result to root
         shell: pwsh
         run: Move-Item -Path "./composeApp/build/compose/binaries/main-release/app/*.zip" -Destination "./" && Move-Item -Path "./composeApp/build/compose/binaries/main-release/msi/*.msi" -Destination "./"
@@ -51,9 +52,9 @@ jobs:
       - run: ./gradlew packageReleaseDistributionForCurrentOS
       - run: ls && tree
       - name: compress
-        run: cd ./composeApp/build/compose/binaries/main-release/app && zip -q -r ./TV-linux-${{ needs.set-tag.outputs.tag }}.zip ./TV
+        run: cd ./composeApp/build/compose/binaries/main-release/app && zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./TV
       - name: move file
-        run: mv ./composeApp/build/compose/binaries/main-release/deb/*.deb ./TV-linux-${{ needs.set-tag.outputs.tag }}.deb && mv ./composeApp/build/compose/binaries/main-release/app/*.zip ./
+        run: mv ./composeApp/build/compose/binaries/main-release/deb/*.deb ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb && mv ./composeApp/build/compose/binaries/main-release/app/*.zip ./
       - run: ls
       - uses: actions/upload-artifact@v4
         with:
@@ -79,7 +80,7 @@ jobs:
       - name: compress
         run: zip -q -r ./TV-mac-${{ needs.set-tag.outputs.tag }}.zip ./composeApp/build/compose/binaries/main-release/app
       - name: move file
-        run: mv ./composeApp/build/compose/binaries/main-release/dmg/*.dmg ./TV-mac-${{ needs.set-tag.outputs.tag }}.dmg
+        run: mv ./composeApp/build/compose/binaries/main-release/dmg/*.dmg ./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg
       - run: ls
       - uses: actions/upload-artifact@v4
         with:
