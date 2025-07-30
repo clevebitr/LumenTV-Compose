@@ -13,6 +13,8 @@ import com.corner.catvodcore.util.Http
 import com.corner.catvodcore.util.Jsons
 import com.corner.catvodcore.util.Utils
 import com.corner.catvodcore.viewmodel.GlobalAppState
+import com.corner.catvodcore.viewmodel.GlobalAppState.hideProgress
+import com.corner.catvodcore.viewmodel.GlobalAppState.showProgress
 import com.corner.ui.scene.SnackBar
 import com.corner.util.copyAdd
 import com.corner.util.createCoroutineScope
@@ -27,24 +29,28 @@ import okhttp3.Response
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.net.URLEncoder
 import java.util.concurrent.CopyOnWriteArrayList
 import com.corner.ui.nav.data.DialogState
 import com.corner.ui.nav.data.DialogState.toggleSpecialVideoLink
+import com.corner.util.M3U8AdFilterInterceptor
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 object SiteViewModel {
     private val log = LoggerFactory.getLogger("SiteViewModel")
-//    val episode: MutableState<Episode?> = mutableStateOf<Episode?>(null)
-    val result: MutableState<Result> by lazy {  mutableStateOf(Result())}
-    val detail: MutableState<Result> by lazy {  mutableStateOf(Result())}
-    val player: MutableState<Result> by lazy {  mutableStateOf(Result())}
-    val search: MutableState<CopyOnWriteArrayList<Collect>> = mutableStateOf(CopyOnWriteArrayList(listOf(Collect.all())))
-    val quickSearch: MutableState<CopyOnWriteArrayList<Collect>> = mutableStateOf(CopyOnWriteArrayList(listOf(Collect.all())))
+
+    val result: MutableState<Result> by lazy { mutableStateOf(Result()) }
+    val detail: MutableState<Result> by lazy { mutableStateOf(Result()) }
+    val player: MutableState<Result> by lazy { mutableStateOf(Result()) }
+    val search: MutableState<CopyOnWriteArrayList<Collect>> =
+        mutableStateOf(CopyOnWriteArrayList(listOf(Collect.all())))
+    val quickSearch: MutableState<CopyOnWriteArrayList<Collect>> =
+        mutableStateOf(CopyOnWriteArrayList(listOf(Collect.all())))
 
     private val supervisorJob = SupervisorJob()
     val viewModelScope = createCoroutineScope(Dispatchers.IO)
 
-    fun cancelAll(){
+    fun cancelAll() {
         supervisorJob.cancelChildren()
     }
 
@@ -80,11 +86,12 @@ object SiteViewModel {
 
                 else -> {
                     //  use 确保 Response 正确关闭
-                    val homeContent: String = Http.newCall(site.api, site.header.toHeaders()).execute().use { response ->
-                        if (!response.isSuccessful) throw IOException("Unexpected code $response")
-                        val body = response.body
-                        body.string()
-                    }
+                    val homeContent: String =
+                        Http.newCall(site.api, site.header.toHeaders()).execute().use { response ->
+                            if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                            val body = response.body
+                            body.string()
+                        }
                     log.debug("home: $homeContent")
                     fetchPic(site, Jsons.decodeFromString<Result>(homeContent)).also { result.value = it }
                 }
@@ -145,92 +152,165 @@ object SiteViewModel {
         return rst
     }
 
+        /**
+     * 获取视频播放信息并处理播放链接
+     * @param key 站点唯一标识
+     * @param flag 播放标识（区分不同播放源）
+     * @param id 视频唯一标识
+     * @return 包含播放链接、头信息等的Result对象，异常时返回null
+     */
     fun playerContent(key: String, flag: String, id: String): Result? {
+        // 根据key获取站点信息，若站点不存在则返回null
         val site: Site = ApiConfig.getSite(key) ?: return null
         try {
+            // 分支1：处理类型为3的站点（爬虫类型站点）
             if (site.type == 3) {
+                // 获取该站点对应的爬虫实例
                 val spider: Spider = ApiConfig.getSpider(site)
+                // 通过爬虫获取播放内容
                 val playerContent = spider.playerContent(flag, id, ApiConfig.api.flags.toList())
-//                log.debug("player:$playerContent")
+                // 记录最近使用的站点
                 ApiConfig.setRecent(site)
+                // 解析播放内容为Result对象
                 val result = Jsons.decodeFromString<Result>(playerContent)
+                // 保留原始播放标识（若存在）
                 if (StringUtils.isNotBlank(result.flag)) result.flag = flag
 
-                // 仅在满足所有条件时才处理M3U8
-                if (result?.url?.v().orEmpty().run {
-                        endsWith(".m3u8") && !contains("proxy") && isNotBlank()
-                    }) {
-                    result.url = processM3U8(result.url)
-                }
+                // 检测包含.m3u8但不以.m3u8结尾的链接（特殊链接处理）
+                // 提取URL基础部分（去除查询参数和片段标识后的部分）
+                val urlStr = result.url.v()
+                if (urlStr.isNotBlank() &&
+                    !urlStr.contains("proxy") &&
+                    urlStr.contains(".m3u8", ignoreCase = true) &&
+                    !urlStr.trim().endsWith(".m3u8", ignoreCase = true)) {
 
+                    log.debug("检测到包含.m3u8的非M3U8链接，弹出弹窗")
+                    if (!DialogState.userChoseOpenInBrowser) {
+                        DialogState.showPngDialog(urlStr) // 显示特殊链接对话框
+                        toggleSpecialVideoLink(true) // 标记为特殊视频链接
+                    } else {
+                        toggleSpecialVideoLink(false) // 取消特殊视频链接标记
+                    }
+                }else{
+                    // 处理标准M3U8链接（以.m3u8结尾、不含proxy、非空）
+                    if (result.url.v().run {
+                            endsWith(".m3u8") && !contains("proxy") && isNotBlank()
+                        }) {
+                        result.url = processM3U8(result.url) // 调用M3U8处理函数
+                    }
+                }
+                // 设置结果头信息和站点key
                 result.header = site.header
                 result.key = key
                 return result
-            } else if (site.type == 4) {
+            }
+            // 分支2：处理类型为4的站点（参数请求类型站点）
+            else if (site.type == 4) {
+                // 构建播放请求参数
                 val params = mutableMapOf<String, String>()
-                params["play"] = id
-                params["flag"] = flag
+                params["play"] = id // 视频ID
+                params["flag"] = flag // 播放标识
+                // 调用call方法获取播放内容
                 val playerContent = call(site, params, true)
-//                log.debug("player: $playerContent")
+                // 解析播放内容为Result对象
                 val result = Jsons.decodeFromString<Result>(playerContent)
+                // 保留原始播放标识（若存在）
                 if (StringUtils.isNotBlank(result.flag)) result.flag = flag
 
-                // 仅在满足所有条件时才处理M3U8
-                if (result?.url?.v().orEmpty().run {
-                        endsWith(".m3u8") && !contains("proxy") && isNotBlank()
-                    }) {
-                    result.url = processM3U8(result.url)
-                }
+                // 检测包含.m3u8但不以.m3u8结尾的链接（特殊链接处理）
+                val urlStr = result.url.v()
+                if (urlStr.isNotBlank() &&
+                    !urlStr.contains("proxy") &&
+                    urlStr.contains(".m3u8", ignoreCase = true) &&
+                    !urlStr.trim().endsWith(".m3u8", ignoreCase = true)) {
 
+                    log.debug("检测到包含.m3u8的非M3U8链接，弹出弹窗")
+                    if (!DialogState.userChoseOpenInBrowser) {
+                        DialogState.showPngDialog(urlStr) // 显示特殊链接对话框
+                        toggleSpecialVideoLink(true) // 标记为特殊视频链接
+                    } else {
+                        toggleSpecialVideoLink(false) // 取消特殊视频链接标记
+                    }
+                }else{
+                    // 处理标准M3U8链接（以.m3u8结尾、不含proxy、非空）
+                    if (result.url.v().run {
+                            endsWith(".m3u8") && !contains("proxy") && isNotBlank()
+                        }) {
+                        result.url = processM3U8(result.url) // 调用M3U8处理函数
+                    }
+                }
+                // 设置结果头信息
                 result.header = site.header
                 return result
-            } else {
+            }
+            // 分支3：处理其他类型站点
+            else {
+                // 初始化播放链接（默认为id）
                 var url: Url = Url().add(id)
+                // 检查是否为JSON类型链接
                 val type: String? = Url(id).parameters["type"]
                 if (type != null && type == "json") {
+                    // 若为JSON类型，请求并解析真实播放链接
                     val string = Http.newCall(id, site.header.toHeaders()).execute().body.string()
                     if (StringUtils.isNotBlank(string)) {
                         url = Jsons.decodeFromString<Result>(string).url
                     }
                 }
+                // 构建Result对象并设置基础信息
                 val result = Result()
                 result.url = url
                 result.flag = flag
 
-                // 仅在满足所有条件时才处理M3U8
-                if (result?.url?.v().orEmpty().run {
-                        endsWith(".m3u8") && !contains("proxy") && isNotBlank()
-                    }) {
-                    result.url = processM3U8(result.url)
-                }
+                // 检测包含.m3u8但不以.m3u8结尾的链接（特殊链接处理）
+                val urlStr = result.url.v()
+                if (urlStr.isNotBlank() &&
+                    !urlStr.contains("proxy") &&
+                    urlStr.contains(".m3u8", ignoreCase = true) &&
+                    !urlStr.trim().endsWith(".m3u8", ignoreCase = true)) {
 
+                    log.debug("检测到包含.m3u8的非M3U8链接，弹出弹窗")
+                    if (!DialogState.userChoseOpenInBrowser) {
+                        DialogState.showPngDialog(urlStr) // 显示特殊链接对话框
+                        toggleSpecialVideoLink(true) // 标记为特殊视频链接
+                    } else {
+                        toggleSpecialVideoLink(false) // 取消特殊视频链接标记
+                    }
+                }else{
+                    // 处理标准M3U8链接（以.m3u8结尾、不含proxy、非空）
+                    if (result.url.v().run {
+                            endsWith(".m3u8") && !contains("proxy") && isNotBlank()
+                        }) {
+                        result.url = processM3U8(result.url) // 调用M3U8处理函数
+                    }
+                }
+                // 设置结果头信息、播放链接和解析标识
                 result.header = site.header
                 result.playUrl = site.playUrl
-                result.parse = (if (StringUtils.isBlank(result.playUrl)) 0 else 1)
+                result.parse = (if (StringUtils.isBlank(result.playUrl)) 0 else 1) // 0：无需解析，1：需要解析
                 return result
             }
         } catch (e: Exception) {
+            // 捕获异常并记录错误日志
             log.error("${site.name} player error:", e)
             return null
         }
     }
 
-        /**
-     * 处理M3U8文件，修正错误的扩展名
+
+    /**
+     * 处理M3U8文件，修正错误的扩展名、处理加密密钥、过滤广告链接并返回本地代理URL
      *
      * @param url 包含 M3U8 文件地址的 Url 对象
-     * @return 处理后的 Url 对象，若处理失败则返回原始 Url 对象
+     * @return 处理后的本地代理 Url 对象，若处理失败则返回原始 Url 对象
      */
     private fun processM3U8(url: Url): Url {
-        // 获取当前的站点信息
-        val site: Site = GlobalAppState.home.value
-
         // 如果不是 .m3u8 文件，直接返回原始 Url 对象
         if (!url.v().endsWith(".m3u8", ignoreCase = true)) {
             return url
         }
 
         try {
+            showProgress()
             // 定义请求 M3U8 文件时需要携带的请求头
             val header: Map<String, String> = mapOf(
                 "Accept" to "application/json, text/javascript, */*; q=0.01",
@@ -251,72 +331,151 @@ object SiteViewModel {
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
                 "X-Requested-With" to "XMLHttpRequest"
             )
-            // 使用use自动关闭资源，确保响应资源被正确释放
-            val content = try {
-                // 发起网络请求获取 M3U8 文件内容
-                Http.newCall(url.v(), headers = header.toHeaders())
-                    .execute()
-                    .use { response ->
-                        if (response.isSuccessful) {
-                            // 下载成功，记录日志并返回响应体内容
-                            log.debug("下载m3u8文件成功，状态码: ${response.code}")
-                            response.body.string()
-                        } else {
-                            // 下载失败，记录错误日志并抛出异常
-                            log.error("下载m3u8文件失败，状态码: ${response.code}")
-                            throw IOException("下载 M3U8 文件失败，状态码: ${response.code}")
-                        }
-                    }
-            } catch (e: Exception) {
-                // 下载过程中发生异常，记录错误日志并重新抛出异常
-                log.error("下载m3u8文件时发生异常", e)
-                throw e
+            val interceptor = M3U8AdFilterInterceptor.Interceptor()
+            // 创建OkHttpClient并添加拦截器
+            val client = OkHttpClient.Builder()
+                .addInterceptor(interceptor)
+                .build()
+
+            // 使用拦截器处理请求
+            val request = Request.Builder()
+                .url(url.v())
+                .headers(header.toHeaders())
+                .build()
+
+            val content = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("下载失败: ${response.code}")
+                response.body.string()
             }
 
-            // 定义正则表达式，仅匹配 jpg 扩展名的 URL
-            val regex = Regex("""(https?://[^\s"']+?\.)(jpg)(?=[\s"'>]|$)""")
-
-            // 执行替换操作，保留完整URL路径，只替换 jpg 扩展名为 ts
-            val processedContent = content.replace(regex) {
-                "${it.groupValues[1]}ts"  // groupValues[1]是URL路径+点号，groupValues[2]是原扩展名 jpg
-            }
-
-            // 定义正则表达式，用于检查是否存在 .png 链接
-            val pngRegex = Regex("https?://[^\\s\"']+?\\.png(?=[\\s\"'>]|$)")
-            if (pngRegex.containsMatchIn(content)) {
-                // 若存在 .png 链接，检查用户是否选择在浏览器中打开
-                if (!DialogState.userChoseOpenInBrowser) {
-                    // 用户未选择在浏览器中打开，显示 PNG 弹窗
-                    DialogState.showPngDialog(url.v())
-                }
-                // 标记为特殊视频链接
-                toggleSpecialVideoLink(true)
+            // 0. 处理加密密钥（仅在存在密钥时处理）
+            val processedKeyContent = if (content.contains("#EXT-X-KEY:")) {
+                processEncryptionKeys(content, url.v())
             } else {
-                // 不存在 .png 链接，取消特殊视频链接标记
-                toggleSpecialVideoLink(false)
+                content
             }
 
-            // 检查是否需要处理，即 M3U8 内容中是否包含 jpg 扩展名
-            if (!regex.containsMatchIn(content)) {
-                // 无需处理，记录日志并返回原始 Url 对象
-                log.debug("M3U8内容无需处理，未发现 jpg 扩展名")
+            // 1. 处理.jpg链接（增强版正则）
+            val jpgRegex = Regex("""(https?://[^\s"']+?\.jpg)[^\s"']*(?=[\s"'>]|$)""", RegexOption.IGNORE_CASE)
+            val processedJpgContent = if (jpgRegex.containsMatchIn(processedKeyContent)) {
+                log.debug("检测到.jpg链接，执行替换...")
+                processedKeyContent.replace(jpgRegex) { match ->
+                    val newUrl = match.groupValues[1].replace(".jpg", ".ts", ignoreCase = true)
+                    log.debug("替换链接: ${match.value} → $newUrl")
+                    newUrl
+                }
+            } else {
+                log.debug("未检测到.jpg链接，跳过替换")
+                processedKeyContent
+            }
+
+            // 2. 特殊链接检测（只匹配.png、.image和无后缀名链接）
+            val pattern = Regex(
+                // 匹配 http/https 协议
+                "https?://" +
+                        // 匹配域名部分（允许点号）
+                        "[^\\s\"'/?#]+" +
+                        // 匹配可选的路径部分（不包含点号）
+                        "(?:/[^\\s\"'.?#]*)*" +
+                        // 匹配三种情况：
+                        // 1. 以.png结尾
+                        // 2. 以.image结尾
+                        // 3. 无后缀名（路径中无点号）
+                        "(?:" +
+                        "\\.(?:png|image)(?=[\\s\"'>]|$)" +  // 情况1和2
+                        "|" +
+                        "(?<!\\.)(?=[\\s\"'>]|$)" +         // 情况3：无后缀名（前面无点号）
+                        ")",
+                RegexOption.IGNORE_CASE
+            )
+
+            if (pattern.containsMatchIn(processedJpgContent)) {
+                log.debug("process检测到特殊链接，弹出弹窗")
+                if (!DialogState.userChoseOpenInBrowser) {
+                    DialogState.showPngDialog(url.v())
+                    toggleSpecialVideoLink(true)
+                } else {
+                    toggleSpecialVideoLink(false)
+                }
                 return url
             }
 
-            // 创建代理URL，将原始 M3U8 文件地址进行 URL 编码
-            val proxyUrl = "http://127.0.0.1:9978/proxy/m3u8?url=${URLEncoder.encode(url.v(), "UTF-8")}"
-            // 返回包含代理 URL 的 Url 对象
-            return Url().add(proxyUrl)
+            // 3. 处理嵌套M3U8
+            val processedContent = Regex("(?m)^(?!#).*\\.m3u8$").replace(processedJpgContent) { match ->
+                val nestedUrl = match.value.let {
+                    if (it.startsWith("http")) it else "${url.v().substringBeforeLast("/")}/$it"
+                }
+                processM3U8(Url().add(nestedUrl)).v() // 递归处理
+            }
+
+            // 缓存内容并返回代理URL
+            val cacheId = M3U8Cache.put(processedContent)
+            return Url().add("http://127.0.0.1:9978/proxy/cached_m3u8?id=$cacheId")
         } catch (e: Exception) {
-            // 处理过程中发生异常，记录错误日志并返回原始 Url 对象
             log.error("处理 M3U8 文件失败", e)
-            return url // 如果处理失败，返回原始URL
+            return url
+        } finally {
+            hideProgress()
+        }
+
+    }
+
+    /**
+     * 处理M3U8中的加密密钥
+     */
+    private fun processEncryptionKeys(content: String, baseUrl: String): String {
+        log.debug("开始处理密钥")
+        val keyRegex = """#EXT-X-KEY:METHOD=([^,]+),URI="([^"]+)"(,IV=([^"]+))?""".toRegex()
+
+        return keyRegex.replace(content) { match ->
+            val (method, uri, _, iv) = match.destructured
+            try {
+                val keyUrl = when {
+                    uri.startsWith("http") -> uri
+                    uri.startsWith("/") -> {
+                        // 修复点：正确提取协议和域名部分
+                        val baseUri = java.net.URI(baseUrl)
+                        "${baseUri.scheme}://${baseUri.host}$uri"
+                    }
+                    else -> {
+                        // 处理相对路径
+                        val basePath = baseUrl.substringBeforeLast("/")
+                        "$basePath/$uri".replace(Regex("(?<!:)//"), "/")
+                    }
+                }
+                log.debug("处理出的密钥链接: $keyUrl")
+                val cacheId = downloadAndStoreKey(keyUrl)
+
+                "#EXT-X-KEY:METHOD=$method,URI=\"$cacheId\"" +
+                        (if (iv.isNotEmpty()) ",IV=$iv" else "")
+            } catch (e: Exception) {
+                log.error("密钥处理失败，保留原始标签", e)
+                match.value
+            }
         }
     }
 
+    /**
+     * 下载并存储加密密钥
+     */
+    private fun downloadAndStoreKey(keyUrl: String): String {
+        val client = OkHttpClient()
+        val request = Request.Builder().url(keyUrl).build()
+
+        val keyData = client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("密钥下载失败")
+            response.body.bytes()
+        }
+
+        // 将密钥数据存入M3U8缓存
+        val cacheId = M3U8Cache.put(String(keyData))
+
+        // 返回通过本地服务器访问的缓存URL
+        return "http://127.0.0.1:9978/proxy/cached_m3u8?id=$cacheId"
+    }
 
 
-        /**
+    /**
      * 根据站点和关键词进行搜索操作，支持快速搜索模式
      *
      * @param site 搜索使用的站点信息
@@ -332,7 +491,7 @@ object SiteViewModel {
                 // 调用爬虫的搜索方法进行搜索
                 val searchContent = spider.searchContent(keyword, quick)
                 // 记录搜索日志，包含站点名称和搜索结果
-                log.debug("search: "+ site.name + "," + searchContent)
+                log.debug("search: " + site.name + "," + searchContent)
                 // 将搜索结果字符串解析为 Result 对象
                 val result = Jsons.decodeFromString<Result>(searchContent)
                 // 将搜索结果进行后续处理，如展示到界面等
@@ -360,7 +519,7 @@ object SiteViewModel {
     }
 
 
-        /**
+    /**
      * 根据指定站点、关键词和页码进行搜索操作，并将搜索结果存储在 `result` 状态中。
      *
      * @param site 搜索使用的站点信息
@@ -408,7 +567,7 @@ object SiteViewModel {
     }
 
 
-        /**
+    /**
      * 根据站点 key、分类 ID、页码、过滤标志和扩展参数获取分类内容
      *
      * @param key 站点的唯一标识
@@ -418,7 +577,13 @@ object SiteViewModel {
      * @param extend 扩展参数，包含额外的请求信息
      * @return 包含分类内容的 Result 对象，若出错则返回表示失败的 Result 对象
      */
-    fun categoryContent(key: String, tid: String, page: String, filter: Boolean, extend: HashMap<String, String>):Result{
+    fun categoryContent(
+        key: String,
+        tid: String,
+        page: String,
+        filter: Boolean,
+        extend: HashMap<String, String>
+    ): Result {
         // 记录方法调用时传入的参数信息，方便调试和监控
         log.info("categoryContent key:{} tid:{} page:{} filter:{} extend:{}", key, tid, page, filter, extend)
         // 根据站点 key 获取对应的站点信息，若未找到则返回表示失败的 Result 对象
@@ -462,32 +627,31 @@ object SiteViewModel {
             result.value = Result(false)
         }
         // 为结果列表中的每个项设置所属站点信息
-        result.value.list.forEach{it.site = site}
+        result.value.list.forEach { it.site = site }
         // 返回最终的结果对象
         return result.value
     }
 
 
-
     private fun post(site: Site, result: Result, quick: Boolean) {
-        if (site.name.isNotEmpty()){
+        if (site.name.isNotEmpty()) {
             SnackBar.postMsg("开始在${site.name}搜索")
         }
-        if(result.list.isEmpty()){
+        if (result.list.isEmpty()) {
             SnackBar.postMsg("${site.name}搜索结果为空,可能是站源问题或尝试换个关键词")
             return
         }
         for (vod in result.list) vod.site = site
         if (quick) {
             search.value = quickSearch.value.copyAdd(Collect.create(result.list))
-            if(quickSearch.value.size == 0){
+            if (quickSearch.value.size == 0) {
                 search.value = quickSearch.value.copyAdd(Collect.all())
             }
             // 同样的数据添加到全部
             quickSearch.value[0].list.addAll(result.list)
         } else {
             search.value = search.value.copyAdd(Collect.create(result.list))
-            if(search.value.size == 0){
+            if (search.value.size == 0) {
                 search.value = search.value.copyAdd(Collect.all())
             }
             // 同样的数据添加到全部
