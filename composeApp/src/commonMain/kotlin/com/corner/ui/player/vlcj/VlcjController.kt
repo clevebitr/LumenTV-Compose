@@ -333,23 +333,29 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         }
     }
 
-    override suspend fun stopAsync() = withContext(Dispatchers.IO) {
+    override suspend fun cleanupAsync() = withContext(Dispatchers.IO) {
         if (isCleaned) return@withContext
         isCleaned = true
         try {
-            log.debug("开始异步停止播放")
+            log.debug("开始异步清理资源...")
             player?.let { p ->
                 try {
-                    p.controls()?.stop()
+                    // 使用超时控制stop操作
+                    withTimeoutOrNull(3000) { // 3秒超时
+                        p.controls()?.stop()
+                    } ?: run {
+                        log.warn("停止播放超时，继续执行资源清理...")
+                    }
                 } catch (e: Exception) {
-                    log.warn("停止播放时出错", e)
+                    log.warn("停止播放时出错，继续执行资源清理", e)
                 }
             }
+            // 取消scope和清理其他资源
             scope.cancel("异步停止播放")
             defferredEffects.clear()
-            log.debug("异步停止播放完成")
+            log.debug("异步清理资源完成!")
         } catch (e: Exception) {
-            log.warn("异步停止播放超时: ${e.message}")
+            log.warn("异步清理资源异常: ${e.message}")
         }
     }
 
@@ -433,7 +439,6 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     private val stateList = listOf(State.ENDED, State.ERROR)
     override fun play() {
         catch {
-            log.debug("play() -- play")
             showTips("播放")
             playerStartTime = System.currentTimeMillis()// 记录播放开始时间
             if (stateList.contains(player?.status()?.state())) {
@@ -477,6 +482,21 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         player?.controls()?.stop()
     }
 
+    override suspend fun stopAsync() = withContext(Dispatchers.IO) {
+        log.debug("异步停止播放...")
+        showTips("停止")
+        try {
+            // 使用超时控制stop操作
+            withTimeoutOrNull(3000) { // 3秒超时
+                player?.controls()?.stop()
+            } ?: run {
+                log.warn("停止播放超时")
+            }
+        } catch (e: Exception) {
+            log.warn("停止播放时出错:", e)
+        }
+    }
+
     override fun dispose() = catch {
         log.debug("dispose - 释放播放器资源")
         scope.cancel()
@@ -496,7 +516,6 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     override fun setVolume(value: Float) = catch {
         player?.audio()?.setVolume((value * 100).toInt().coerceIn(0..150))
         _state.update { it.copy(volume = value) }
-        showTips("音量：${player?.audio()?.volume()}")
         if (value > 0f) {
             SettingStore.doWithCache {
                 var state = it["playerState"]
@@ -506,6 +525,10 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
                 }
                 (state as PlayerStateCache).add("volume", value.toString())
             }
+        }
+        scope.launch {
+            delay(50) // 短暂延迟确保状态同步
+            showTips("音量：${(value * 100).toInt().coerceIn(0..100)}")
         }
     }
 
