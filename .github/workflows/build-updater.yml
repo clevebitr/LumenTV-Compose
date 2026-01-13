@@ -51,6 +51,7 @@ jobs:
 
     - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
       working-directory: ./Updater
+      shell: bash
       run: |
         go mod tidy
         GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -o ${{ matrix.binary_name }} .
