@@ -112,6 +112,13 @@ fun main() {
                             val zipFile = File(tempDir, "LumenTV-update.zip")
 
                             try {
+                                if (zipFile.exists()) {
+                                    scope.launch {
+                                        UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
+                                        UpdateLauncher.exitApplication()
+                                    }
+                                    return@launch
+                                }
                                 UpdateDownloader.downloadUpdateSync(
                                     updateResult!!.downloadUrl,
                                     zipFile
