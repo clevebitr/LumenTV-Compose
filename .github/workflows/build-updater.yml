@@ -1,6 +1,23 @@
 name: Build Updater
 
+# 添加手动触发
 on:
+  workflow_dispatch:  # 允许手动运行
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      is_prerelease:
+        description: 'Is Pre-release?'
+        required: false
+        type: boolean
+        default: false
+      draft_release:
+        description: 'Draft Release?'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [ main, master ]
     tags: [ 'v*' ]
@@ -17,80 +34,120 @@ jobs:
             goos: linux
             goarch: amd64
             binary_name: updater
-            output_name: updater-linux-amd64
+            output_name: updater
+            artifact_suffix: linux-amd64
           - os: ubuntu-latest
             goos: linux
             goarch: arm64
             binary_name: updater
-            output_name: updater-linux-arm64
+            output_name: updater
+            artifact_suffix: linux-arm64
           - os: windows-latest
             goos: windows
             goarch: amd64
             binary_name: updater.exe
-            output_name: updater-windows-amd64.exe
+            output_name: updater.exe
+            artifact_suffix: windows-amd64
           - os: macos-latest
             goos: darwin
             goarch: amd64
             binary_name: updater
-            output_name: updater-macos-amd64
+            output_name: updater
+            artifact_suffix: macos-amd64
           - os: macos-latest
             goos: darwin
             goarch: arm64
             binary_name: updater
-            output_name: updater-macos-arm64
+            output_name: updater
+            artifact_suffix: macos-arm64
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.23'
-        cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
 
-    - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
-      working-directory: ./Updater
-      run: |
-        go mod tidy
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -o ${{ matrix.binary_name }} .
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
+      - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
+        working-directory: ./Updater
+        shell: bash
+        run: |
+          go mod tidy
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -ldflags="-s -w" -o ${{ matrix.binary_name }} .
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
 
-    - name: Upload binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: ${{ matrix.output_name }}
-        path: ./Updater/${{ matrix.binary_name }}
+      - name: Prepare artifact name
+        id: artifact-name
+        run: |
+          echo "artifact_name=updater-${{ matrix.artifact_suffix }}" >> $GITHUB_OUTPUT
+
+      - name: Upload binaries as permanent artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-binary-${{ matrix.os }}-${{ matrix.goarch }}
+          path: ./Updater/${{ matrix.binary_name }}
+          retention-days: 0  # 永久保存
 
   create-release:
     needs: build-updater
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-      with:
-        path: ./artifacts
+      - name: Determine release info
+        id: release-info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag_name=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+            echo "is_manual=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is_manual=false" >> $GITHUB_OUTPUT
+          fi
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ./artifacts/*/updater*
-        name: Updater v${{ github.ref_name }}
-        tag_name: ${{ github.ref }}
-        body: |
-          ## 更新程序二进制文件
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p ./release-assets
+          find ./artifacts -name "updater-*" -exec cp {} ./release-assets/ \;
           
-          此版本包含适用于不同操作系统的更新程序：
-          
-          - `updater-linux-amd64` - Linux AMD64 架构
-          - `updater-linux-arm64` - Linux ARM64 架构  
-          - `updater-windows-amd64.exe` - Windows AMD64 架构
-          - `updater-macos-amd64` - macOS AMD64 架构
-          - `updater-macos-arm64` - macOS ARM64 架构
-        draft: false
-        prerelease: false
+          # Rename files to include version
+          cd ./release-assets
+          for file in updater-*; do
+            if [ -f "$file" ]; then
+              versioned_name=$(echo "$file" | sed "s/updater-/updater-${{ steps.release-info.outputs.tag_name }}-/g")
+              mv "$file" "$versioned_name"
+            fi
+          done
+          ls -la
+
+      - name: Create Separate Updater Release
+        uses: ncipollo/release-action@v1
+        with:
+          name: "Updater ${{ steps.release-info.outputs.tag_name }}"
+          tag: "updater-${{ steps.release-info.outputs.tag_name }}"  # 使用不同的标签前缀避免冲突
+          artifacts: "./release-assets/*"
+          body: |
+            ## Updater Release ${{ steps.release-info.outputs.tag_name }}
+            
+            This release contains updater binaries for different platforms:
+            
+            - `updater-${{ steps.release-info.outputs.tag_name }}-linux-amd64` - Linux AMD64
+            - `updater-${{ steps.release-info.outputs.tag_name }}-linux-arm64` - Linux ARM64  
+            - `updater-${{ steps.release-info.outputs.tag_name }}-windows-amd64.exe` - Windows AMD64
+            - `updater-${{ steps.release-info.outputs.tag_name }}-macos-amd64` - macOS AMD64
+            - `updater-${{ steps.release-info.outputs.tag_name }}-macos-arm64` - macOS ARM64
+            
+            **Note:** This release is separate from the main project releases and uses the `updater-` prefix to avoid conflicts.
+          draft: ${{ github.event.inputs.draft_release || 'false' }}
+          prerelease: ${{ github.event.inputs.is_prerelease || 'false' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

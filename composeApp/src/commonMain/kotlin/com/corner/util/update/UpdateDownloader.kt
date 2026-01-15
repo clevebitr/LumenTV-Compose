@@ -20,6 +20,11 @@ class UpdateDownloader {
     companion object {
         private val log = LoggerFactory.getLogger(UpdateDownloader::class.java)
 
+        // 检测更新文件是否已存在
+        fun isUpdateFileExists(destination: File): Boolean {
+            return destination.exists()
+        }
+
         fun downloadUpdate(
             url: String,
             destination: File,

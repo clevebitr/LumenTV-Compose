@@ -8,8 +8,6 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.readAvailable
-import io.ktor.utils.io.core.use
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,8 +19,6 @@ import java.nio.file.Path
 class UpdateLauncher {
     companion object {
         private val log = LoggerFactory.getLogger(UpdateLauncher::class.java)
-        private const val UPDATER_VERSION_URL =
-            "https://api.github.com/repos/xiaolong0302/LumenTV-Compose/releases/latest"
 
         suspend fun launchUpdater(zipFile: File, updaterUrl: String? = null): Boolean {
             return try {
@@ -101,31 +97,42 @@ class UpdateLauncher {
         }
 
         private suspend fun downloadUpdater(updaterDir: Path, updaterUrl: String?): File {
-            val updaterName = when (UserDataDirProvider.currentOs) {
-                OperatingSystem.Windows -> "updater.exe"
-                OperatingSystem.Linux -> "updater"
-                OperatingSystem.MacOS -> "updater"
-                OperatingSystem.Unknown -> "updater"
-            }
-
+            val updaterName = PlatformDetector.getUpdaterFileName()
             val targetFile = updaterDir.resolve(updaterName).toFile()
 
             if (targetFile.exists()) {
                 return targetFile
             }
 
-            val url = updaterUrl ?: getUpdaterUrlFromGitHub()
+            val currentDir = getCurrentDirectory()
+            val localUpdaterFile = currentDir.resolve(updaterName).toFile()
+
+            if (localUpdaterFile.exists()) {
+                try {
+                    Files.move(
+                        localUpdaterFile.toPath(),
+                        targetFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    )
+                    log.info("Updater moved from local to: $targetFile")
+                    return targetFile
+                } catch (e: Exception) {
+                    log.error("Failed to move updater from local directory", e)
+                }
+            }
+
+            val url = updaterUrl ?: getUpdaterUrlFromActions()
 
             if (url != null) {
                 try {
                     val client = HttpClient()
                     val response: HttpResponse = client.get(url)
                     val channel: ByteReadChannel = response.body()
-                    val tempFile = File(updaterDir.toFile(), "${updaterName}.tmp")
+                    val zipTempFile = File(updaterDir.toFile(), "${updaterName}.zip.tmp")
 
-                    // 使用正确的异步文件写入方式
+                    // 下载ZIP文件
                     withContext(Dispatchers.IO) {
-                        val fileOutputStream = tempFile.outputStream()
+                        val fileOutputStream = zipTempFile.outputStream()
                         try {
                             val buffer = ByteArray(8192)
                             var bytesRead: Int
@@ -139,41 +146,86 @@ class UpdateLauncher {
                         }
                     }
 
-                    Files.move(
-                        tempFile.toPath(),
-                        targetFile.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
-                    )
+                    // 解压ZIP文件
+                    extractUpdaterFromZip(zipTempFile, targetFile)
+
+                    // 删除临时ZIP文件
+                    zipTempFile.delete()
+
+                    // 设置执行权限 (Linux/macOS)
+                    if (UserDataDirProvider.currentOs != OperatingSystem.Windows) {
+                        targetFile.setExecutable(true)
+                    }
 
                     client.close()
-                    log.info("Updater downloaded to: $targetFile")
+                    log.info("Updater extracted to: $targetFile")
                 } catch (e: Exception) {
-                    log.error("Failed to download updater", e)
+                    log.error("Failed to download and extract updater", e)
                 }
             }
 
             return targetFile
         }
 
+        private fun extractUpdaterFromZip(zipFile: File, targetFile: File) {
+            val zipInputStream = java.util.zip.ZipInputStream(zipFile.inputStream())
+            try {
+                var entry = zipInputStream.nextEntry
+                while (entry != null) {
+                    // 查找与期望的更新程序名称匹配的条目
+                    if (entry.name.endsWith(targetFile.name)) {
+                        // 创建目标目录
+                        targetFile.parentFile.mkdirs()
 
-        private suspend fun getUpdaterUrlFromGitHub(): String? {
-            return withContext(Dispatchers.IO) {
-                try {
-                    val client = HttpClient()
-                    val response: HttpResponse = client.get(UPDATER_VERSION_URL)
-                    val versionInfo = kotlinx.serialization.json.Json {
-                        ignoreUnknownKeys = true
-                    }.decodeFromString<VersionInfo>(response.body())
+                        // 提取文件
+                        val fileOutputStream = targetFile.outputStream()
+                        try {
+                            zipInputStream.copyTo(fileOutputStream)
+                        } finally {
+                            fileOutputStream.close()
+                        }
 
-                    val updaterUrl = versionInfo.updater_url
-                    client.close()
-                    updaterUrl
-                } catch (e: Exception) {
-                    log.error("Failed to get updater URL", e)
-                    null
+                        log.info("Extracted updater file: ${targetFile.absolutePath}")
+                        break
+                    }
+                    entry = zipInputStream.nextEntry
+                }
+
+                if (!targetFile.exists()) {
+                    throw Exception("Updater file not found in ZIP: ${targetFile.name}")
+                }
+            } finally {
+                zipInputStream.close()
+            }
+        }
+
+
+        private suspend fun getUpdaterUrlFromActions(): String? {
+            val platformIdentifier = PlatformDetector.getPlatformIdentifier()
+
+            return when (platformIdentifier) {
+                "macos-latest-amd64" ->
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-macos-latest-amd64.zip"
+
+                "macos-latest-arm64" ->
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-macos-latest-arm64.zip"
+
+                "ubuntu-latest-amd64" ->
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-amd64.zip"
+
+                "ubuntu-latest-arm64" ->
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-arm64.zip"
+
+                "windows-latest-amd64" ->
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-windows-latest-amd64.zip"
+
+                else -> {
+                    log.warn("Unsupported platform: $platformIdentifier, falling back to ubuntu-latest-amd64")
+                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-amd64.zip"
                 }
             }
         }
+
 
         private fun getCurrentDirectory(): Path {
             val jarPath = File(UpdateLauncher::class.java.protectionDomain.codeSource.location.toURI()).toPath()
