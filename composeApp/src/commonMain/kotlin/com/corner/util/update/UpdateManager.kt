@@ -14,7 +14,7 @@ class UpdateManager {
     companion object {
         private val log = LoggerFactory.getLogger(UpdateManager::class.java)
         private const val VERSION_URL = "https://github.com/clevebitr/LumenTV-Compose/releases/latest/download/version.json"
-        private const val CURRENT_VERSION = "1.1.0"
+        private const val CURRENT_VERSION = "1.1.1"
 
         private val json = Json {
             ignoreUnknownKeys = true

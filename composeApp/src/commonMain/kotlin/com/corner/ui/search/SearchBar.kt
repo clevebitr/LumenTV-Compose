@@ -43,6 +43,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.window.PopupProperties
+import com.corner.catvodcore.viewmodel.SiteViewModel.viewModelScope
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -148,7 +149,7 @@ fun SearchBar(
                         textFieldValue = newValue
                         searchText = newValue.text
                         job?.cancel()
-                        job = SiteViewModel.viewModelScope.launch {
+                        job = viewModelScope.launch {
                             if (isGettingSuggestion || searchText.isBlank()) return@launch
                             delay(500)
                             isGettingSuggestion = true
@@ -159,8 +160,8 @@ fun SearchBar(
                                     val body = response.bodyAsText()
                                     suggestions = Suggest.objectFrom(body)
                                 }
-                            } catch (e:Exception) {
-                            }finally {
+                            } catch (e: Exception) {
+                            } finally {
                                 isGettingSuggestion = false
                             }
                         }
@@ -266,16 +267,25 @@ fun SearchBar(
                 }
             }
         }
-
         AlertDialog(
             onDismissRequest = { showSearchSiteDialog = false },
             title = {
-                Text("选择搜索网站",
+                Text(
+                    "选择搜索网站",
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary)
+                    color = MaterialTheme.colorScheme.primary
+                )
             },
             text = {
                 Column {
+                    // 提示文本
+                    Text(
+                        "注意：如果取消选择的搜索站点，下次启动应用将不会显示这些网站。\n如果需要重新启用，则需要在首页站点设置中手动重新启用搜索功能。",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
                     // 全选行
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -291,7 +301,8 @@ fun SearchBar(
                         Text(
                             "全选",
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f))
+                            modifier = Modifier.weight(1f)
+                        )
                         TriStateCheckbox(
                             state = parentState.value,
                             onClick = {
@@ -301,6 +312,8 @@ fun SearchBar(
                                         site.searchable = if (newState) 1 else 0
                                     }
                                 }
+
+                                vm.updateAllSearchConfigs(parentState.value != ToggleableState.On)
                             },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = MaterialTheme.colorScheme.primary
@@ -330,16 +343,22 @@ fun SearchBar(
                             ) {
                                 Checkbox(
                                     checked = site.isSearchable(),
-                                    onCheckedChange = {
+                                    onCheckedChange = { isChecked ->
                                         vm.updateModel {
                                             it.searchableSites.first { iSite -> iSite.key == site.key }
                                                 ?.apply { toggleSearchable() }
                                         }
+
+                                        vm.saveSearchConfigToDb(
+                                            site.key,
+                                            isChecked
+                                        )
                                     },
                                     colors = CheckboxDefaults.colors(
                                         checkedColor = MaterialTheme.colorScheme.primary
                                     )
                                 )
+
                                 Text(
                                     site.name,
                                     style = MaterialTheme.typography.bodyMedium,

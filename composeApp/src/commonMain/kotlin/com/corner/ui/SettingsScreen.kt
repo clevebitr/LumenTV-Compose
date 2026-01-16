@@ -147,6 +147,37 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                         }
                     },
                     actions = {
+                        FilledTonalButton(
+                            onClick = {
+                                Desktop.getDesktop().open(Paths.logPath())
+                            },
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = ButtonDefaults.filledTonalButtonElevation(
+                                defaultElevation = 2.dp,
+                                pressedElevation = 4.dp
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Code, // 或其他合适的图标
+                                    contentDescription = "日志目录",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    "日志目录",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                         // 数据目录按钮
                         FilledTonalButton(
                             onClick = { Desktop.getDesktop().open(Paths.userDataRoot()) },
@@ -1196,7 +1227,7 @@ fun AboutDialog(
                         )
 
                         Text(
-                            text = "1.1.0",
+                            text = "1.1.1",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )

@@ -18,6 +18,12 @@ interface SiteDao{
     @Query("SELECT * FROM Site where configId = :configId")
     fun findByConfigId(configId: Long): Flow<List<Site>>
 
+    @Query("SELECT * FROM Site")
+    fun getAllSites(): Flow<List<Site>>
+
+    @Query("UPDATE Site SET searchable = :searchable WHERE `key` = :siteKey")
+    suspend fun updateSearchable(siteKey: String, searchable: Long)
+
     @Update
     suspend fun update(site:Site)
 
