@@ -147,6 +147,9 @@ compose.desktop {
                 iconFile.set(project.file("src/commonMain/composeResources/drawable/LumenTV-icon-win.ico"))
                 dirChooser = true
                 upgradeUuid = "161FA5A0-A30B-4568-9E84-B3CD637CC8FE"
+                perUserInstall = true
+                menu = true
+                shortcut = true
             }
 
             linux {

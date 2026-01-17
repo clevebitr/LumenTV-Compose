@@ -24,6 +24,7 @@
         - [平台支持](#平台支持)
     - [更新日志 (Changelog)](#更新日志-changelog)
     - [下载](#下载)
+    - [自更新](#自更新)
     - [关于讨论群](#关于讨论群)
     - [声明](#声明)
     - [TODO](#todo)
@@ -78,6 +79,12 @@
 
 [前往 Release 页面下载](https://github.com/clevebitr/LumenTV-Compose/releases)
 
+## 自更新
+本项目支持自动更新，您可以通过以下方式进行更新：
+- 运行 `LumenTV-Compose.exe` 自动检查更新
+- 通过设置页手动检查更新
+### ❗强烈建议阅读自更新说明文档：
+[查看自更新说明文档](https://github.com/clevebitr/LumenTV-Compose/blob/main/Updater/README.md)
 
 ## 关于讨论群
 本项目无讨论群！不要在原项目 tg 群里提及有关该项目问题！
