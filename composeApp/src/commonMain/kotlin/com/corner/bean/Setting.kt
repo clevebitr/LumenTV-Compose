@@ -119,6 +119,7 @@ object SettingStore {
 
     init {
         getSettingList()
+        getM3U8FilterConfig()
     }
     fun getSettingItem(s: String): String {
         return settingFile.list.find { it.id == s }?.value ?: ""
@@ -181,8 +182,6 @@ object SettingStore {
             settingFile.list.addAll(defaultList)
             Files.write(file, Jsons.encodeToString(settingFile).toByteArray())
         }
-        // 初始化 M3U8FilterConfig
-        initM3U8FilterConfig()
     }
 
     fun getHistoryList(): Set<String> {
@@ -226,11 +225,6 @@ object SettingStore {
                 M3U8FilterConfig()
             }
         }
-    }
-
-    fun initM3U8FilterConfig(){
-        val filterConfig = getM3U8FilterConfig()
-        log.debug("加载广告过滤配置: {}", filterConfig)
     }
 
     fun setM3U8FilterConfig(config: M3U8FilterConfig) {

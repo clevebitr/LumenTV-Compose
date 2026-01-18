@@ -61,16 +61,19 @@ object JarLoader {
                 log.debug("<loadJar>texts is {}", texts)
                 when {
                     md5.isNotEmpty() && Utils.equals(parseJarUrl(jar), md5) -> {
+                        log.info("md5校验成功，以md5方式加载...")
                         load(key, Paths.jar(parseJarUrl(jar)))
                         return
                     }
 
                     jar.startsWith("file") -> {
+                        log.info("jar文件已存在，以文件方式加载...")
                         load(key, Paths.local(jar))
                         return
                     }
 
                     jar.startsWith("http") -> {
+                        log.info("jar文件不存在，以http方式加载...")
                         load(key, download(jar))
                         return
                     }

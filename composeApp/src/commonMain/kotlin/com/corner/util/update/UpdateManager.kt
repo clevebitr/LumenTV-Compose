@@ -76,7 +76,7 @@ class UpdateManager {
                         UpdateResult.NoUpdate
                     }
                 } catch (e: Exception) {
-                    log.error("Failed to check for updates", e)
+                    log.error("Failed to check for updates {}", e.message)
                     UpdateResult.Error(e.message ?: "Unknown error")
                 }
             }

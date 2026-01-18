@@ -69,10 +69,14 @@ object ApiConfig {
             }
 
             val apiConfig = Jsons.decodeFromString<Api>(data)
-            apiFlow.update { apiConfig }
-            apiFlow.update { ap ->
-                ap.copy(url = cfg.url, data = data, cfg = cfg, ref = ap.ref + 1)
-            }
+            val updatedApi = apiConfig.copy(url = cfg.url, data = data, cfg = cfg, ref = apiConfig.ref + 1)
+            apiFlow.update { updatedApi }
+//            apiFlow.update { apiConfig }
+//            apiFlow.update { ap ->
+//                ap.copy(url = cfg.url, data = data, cfg = cfg, ref = ap.ref + 1)
+//            }
+
+            api = updatedApi
 
             JarLoader.loadJar("", apiConfig.spider)
 
