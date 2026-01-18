@@ -831,6 +831,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                                             "发现新版本 ${updateCheckState.latestVersion}，请重启应用进行更新",
                                             type = SnackBar.MessageType.INFO
                                         )
+
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
