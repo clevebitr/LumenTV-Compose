@@ -54,7 +54,7 @@ object JarLoader {
             try {
                 if (StringUtils.isBlank(currentSpider)) return
 
-                val texts = currentSpider.split(Constant.md5Split)
+                val texts = currentSpider.split(Constant.MD5_SPLIT)
                 val md5 = if (texts.size <= 1) "" else texts[1].trim()
                 val jar = texts[0]
                 log.debug("<loadJar>md5 is {}", md5)
@@ -175,7 +175,7 @@ object JarLoader {
         val jarPath = Paths.jar(jar)
         log.debug("download jar file {} to:{}", jar, jarPath)
 
-        return Http.Get(jar).execute().use { response ->
+        return Http.get(jar).execute().use { response ->
             val body = response.body
             Paths.write(jarPath, body.bytes())
         }

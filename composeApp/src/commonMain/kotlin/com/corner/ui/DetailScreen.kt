@@ -62,14 +62,11 @@ import com.corner.ui.nav.data.DetailScreenState
 import com.corner.ui.nav.data.DialogState
 import com.corner.ui.nav.data.DialogState.openDialogState
 import com.corner.ui.nav.vm.DetailViewModel
-import com.corner.ui.player.vlcj.VlcjFrameController
 import com.corner.ui.scene.*
 import com.corner.ui.video.QuickSearchItem
 import com.corner.util.play.BrowserUtils
 import com.corner.util.Constants
-import com.corner.util.thisLogger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -247,7 +244,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                 if (localShowPngDialog && !DialogState.userChoseOpenInBrowser) {
                     PngFoundDialog(
                         m3u8Url = localCurrentM3U8Url,
-                        Text = "在当前播放的m3u8文件中，检测到了特殊链接，是否跳转到浏览器播放？",
+                        text = "在当前播放的m3u8文件中，检测到了特殊链接，是否跳转到浏览器播放？",
                         onDismiss = {
                             localShowPngDialog = false
                             DialogState.dismissPngDialog()
@@ -375,8 +372,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                                     modifier = Modifier.fillMaxWidth().fillMaxHeight().background(
                                         MaterialTheme.colorScheme.surface,
                                         shape = RoundedCornerShape(10.dp)
-                                    ),
-                                    buttonAlignment = ButtonAlignment.LEFT
+                                    )
                                 )
                             } else {
                                 // 左侧视频信息区域 (占50%宽度)
@@ -1066,8 +1062,7 @@ fun TopNotification(
                 modifier = Modifier
                     .height(50.dp)
                     .fillMaxWidth(),
-                showIcon = false,
-                buttonAlignment = ButtonAlignment.RIGHT
+                showIcon = false
             )
         }
     }

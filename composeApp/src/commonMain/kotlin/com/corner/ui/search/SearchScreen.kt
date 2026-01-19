@@ -41,8 +41,7 @@ import com.corner.ui.scene.RatioBtn
 import com.corner.ui.video.VideoItem
 
 enum class SearchPageType {
-    page,
-    content
+    PAGE
 }
 
 private val gridConfig = object {
@@ -161,9 +160,8 @@ private fun WindowScope.SearchResult(
                             searchText.value,
                             onSearch = { s ->
                                 vm.onSearch(s)
-                            }, model.value.isSearching,
+                            }, model.value.isSearching
                             // 自定义焦点请求逻辑
-                            onFocusRequested = { focusRequester.requestFocus() }
                         )
                     }
                 )

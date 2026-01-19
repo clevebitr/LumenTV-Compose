@@ -16,15 +16,6 @@ private val log = LoggerFactory.getLogger("Setting")
 @Serializable
 data class Setting(val id: String, val label: String, var value: String = "")
 
-/**
- * 以井号分割的字符串
- * #
- */
-@Suppress("UNUSED_FUNCTION")
-fun Setting.parseValueToList():List<String>{
-    return value?.split("#") ?: listOf()
-}
-
 @Serializable
 sealed interface Cache{
     fun getName():String
@@ -78,7 +69,7 @@ class PlayerStateCache:Cache{
     }
 
     fun get(key: String):String?{
-        return map.get(key)
+        return map[key]
     }
 
 }
@@ -115,7 +106,7 @@ object SettingStore {
         Setting("dohServer", "DoH服务器", "Tencent")
     )
 
-    private var settingFile = SettingFile(mutableListOf<Setting>(), mutableMapOf())
+    private var settingFile = SettingFile(mutableListOf(), mutableMapOf())
 
     init {
         getSettingList()
@@ -246,7 +237,7 @@ data class SettingEnable(
     val value: String
 ){
     companion object{
-        fun Default():SettingEnable{
+        fun default():SettingEnable{
             return SettingEnable(false, "")
         }
     }

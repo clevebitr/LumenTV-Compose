@@ -15,7 +15,7 @@ data class SearchScreenState(
     val hotList:List<HotData> = listOf(),
     val historyList:Set<String> = setOf(),
     var currentVodList: MutableState<MutableList<Vod>> = mutableStateOf(mutableListOf()),
-    var currentPage: SearchPageType = SearchPageType.page,
+    var currentPage: SearchPageType = SearchPageType.PAGE,
     var searchCompleteSites: CopyOnWriteArraySet<String> = CopyOnWriteArraySet(),
     var searchableSites: CopyOnWriteArraySet<Site> = CopyOnWriteArraySet(),
     var searchBarText: String = "",

@@ -31,7 +31,7 @@ data class Suggest(
                 val items = mutableListOf<String>()
                 for (item in objectFrom(str).data?: listOf()) items.add(item.name)
                 return items
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return mutableListOf()
             }
         }

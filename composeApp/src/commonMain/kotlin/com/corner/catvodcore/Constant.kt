@@ -1,8 +1,7 @@
 package com.corner.catvodcore
 
 object Constant{
-    val THREAD_POOL: Int = 5
-    val md5Split:String = ";md5;"
+    const val MD5_SPLIT:String = ";md5;"
 
     val catVodSpider = "com.github.catvod.spider".trim()
 

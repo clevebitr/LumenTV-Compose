@@ -21,13 +21,13 @@ data class Hot(val data: List<HotData>) {
         fun getHotList() {
             SiteViewModel.viewModelScope.launch {
                 try {
-                    Http.Get(
+                    Http.get(
                         "https://api.web.360kan.com/v1/rank?cat=1",
                         headers = mapOf(HttpHeaders.Referrer to "https://www.360kan.com/rank/general").toHeaders()
                     ).execute().use { response ->
                         if (response.isSuccessful) {
                             GlobalAppState.hotList.value = Jsons.decodeFromStream<Hot>(
-                                response.body!!.byteStream()
+                                response.body.byteStream()
                             ).data
                         }
                     }

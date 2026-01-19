@@ -55,7 +55,7 @@ suspend fun multiThreadDownload(url: String, thread: Int, call: ApplicationCall?
             launch(Dispatchers.IO) {
                 for (segment in segmentChannel) {
                     try {
-                        downloadSegment(url, segment, call)
+                        downloadSegment(url, segment)
                     } catch (e: Exception) {
                         logger.error("分段下载失败 [$segment]", e)
                     }
@@ -81,7 +81,7 @@ private fun createSegments(contentLength: Long, segmentSize: Long): List<Pair<Lo
     }
 }
 
-suspend fun downloadSegment(url: String, segment: Pair<Long, Long>, call: ApplicationCall?) {
+suspend fun downloadSegment(url: String, segment: Pair<Long, Long>) {
     // 依赖协程作用域自动管理资源
     val data = KtorClient.client.get(url) {
         header(HttpHeaders.Range, "bytes=${segment.first}-${segment.second}")
@@ -90,15 +90,3 @@ suspend fun downloadSegment(url: String, segment: Pair<Long, Long>, call: Applic
     logger.debug("下载完成: ${segment.first}-${segment.second}, 大小: ${data.size}")
     // TODO: 处理数据
 }
-
-//suspend fun downloadSegment(url: String, segment: Pair<Long, Long>, call: ApplicationCall?) {
-//    val response = KtorClient.client.get {
-//        url(url)
-//        header(HttpHeaders.Range, "bytes=${segment.first}-${segment.second}")
-//    }
-////    call.respondOutputStream {
-////        write(response.body<ByteArray>())
-////        headers { response.headers }
-////    }
-//    println("${response.contentLength()} ${response.headers.get(HttpHeaders.ContentRange)}")
-//}

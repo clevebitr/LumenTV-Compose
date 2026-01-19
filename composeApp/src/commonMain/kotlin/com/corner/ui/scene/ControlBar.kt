@@ -1,6 +1,5 @@
 package com.corner.ui.scene
 
-import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -9,8 +8,7 @@ import androidx.compose.material.Divider
 import androidx.compose.material.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CropSquare
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -34,7 +32,7 @@ fun ControlBar(
     title: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier.height(64.dp),
     leading: @Composable (() -> Unit)? = null,
-    center: @Composable() (() -> Unit?)? = null,
+    center: @Composable (() -> Unit?)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Column(
@@ -95,33 +93,30 @@ fun ControlBar(
 
 
 @Composable
-private fun RowScope.WindowControlButtons() {
+private fun WindowControlButtons() {
     // 最小化按钮
     WindowControlButton(
-        icon = Icons.Default.Minimize,
         description = "Minimize",
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f), // 半透明表面变体,
         contentColor = MaterialTheme.colorScheme.primary,
-        onClick = {
-            GlobalAppState.windowState?.isMinimized = !GlobalAppState.windowState?.isMinimized!!
-        }
-    )
+        icon = Icons.Default.Minimize
+    ) {
+        GlobalAppState.windowState?.isMinimized = !GlobalAppState.windowState?.isMinimized!!
+    }
 
     // 最大化/还原按钮
     WindowControlButton(
-        icon = if (GlobalAppState.windowState?.placement == WindowPlacement.Maximized)
-            Icons.Default.KeyboardArrowUp else Icons.Default.CropSquare,
         description = "Maximize/Restore",
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f), // 半透明表面变体,,
         contentColor = MaterialTheme.colorScheme.primary,
-        onClick = {
-            GlobalAppState.windowState?.placement =
-                if (GlobalAppState.windowState?.placement == WindowPlacement.Maximized)
-                    WindowPlacement.Floating
-                else
-                    WindowPlacement.Maximized
-        }
-    )
+        icon = Icons.Default.Fullscreen
+    ) {
+        GlobalAppState.windowState?.placement =
+            if (GlobalAppState.windowState?.placement == WindowPlacement.Maximized)
+                WindowPlacement.Floating
+            else
+                WindowPlacement.Maximized
+    }
 
     // 关闭按钮
     WindowControlButton(
@@ -129,16 +124,15 @@ private fun RowScope.WindowControlButtons() {
         description = "Close",
         containerColor = Color.Red,
         contentColor = MaterialTheme.colorScheme.error,
-        iconTint = Color.White,
-        onClick = { // 在关闭应用时
-            log.info("Close App")
-            GlobalAppState.closeApp.value = true
-        }
-    )
+        iconTint = Color.White
+    ) { // 在关闭应用时
+        log.info("Close App")
+        GlobalAppState.closeApp.value = true
+    }
 }
 
 @Composable
-private fun RowScope.WindowControlButton(
+private fun WindowControlButton(
     icon: ImageVector,
     description: String,
     containerColor: Color,
@@ -166,10 +160,7 @@ private fun RowScope.WindowControlButton(
     }
 }
 
-private inline fun Modifier.thenIf(condition: Boolean): Modifier =
-    if (condition) this else Modifier
-
-
+@Suppress("unused")
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun CustomActionButton(
@@ -190,14 +181,5 @@ fun CustomActionButton(
         shape = shape
     ) {
         content()
-    }
-}
-
-@Composable
-@Preview
-fun previewControlBar() {
-    MaterialTheme {
-//        ControlBar{
-//        }
     }
 }

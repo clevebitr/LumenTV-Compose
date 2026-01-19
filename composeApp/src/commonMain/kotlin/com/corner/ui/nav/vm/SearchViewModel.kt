@@ -24,7 +24,7 @@ class SearchViewModel : BaseViewModel() {
     private val _state = MutableStateFlow(SearchScreenState())
     val state: StateFlow<SearchScreenState> = _state
 
-    private var jobList: MutableList<Job> = mutableListOf<Job>()
+    private var jobList: MutableList<Job> = mutableListOf()
 
     private val supervisorJob = SupervisorJob()
     private val searchScope: CoroutineScope = CoroutineScope(Dispatchers.Default.limitedParallelism(8) + supervisorJob)
@@ -48,8 +48,8 @@ class SearchViewModel : BaseViewModel() {
         }
 
         scope.launch {
-            _state.collect() {
-                _state.update { it.copy(searchBarText = getSearchBarText(_state.value)) }
+            _state.collect {
+                _state.update { it.copy(searchBarText = getSearchBarText()) }
             }
         }
     }
@@ -59,7 +59,7 @@ class SearchViewModel : BaseViewModel() {
         supervisorJob.cancelChildren(CancellationException("onDestroy"))
     }
 
-    private fun getSearchBarText(model: SearchScreenState): String {
+    private fun getSearchBarText(): String {
         val size = _state.value.searchableSites.filter { it.isSearchable() }.size
         if (_state.value.isSearching) return "${_state.value.searchCompleteSites.size}/$size"
         return "$size"
@@ -162,7 +162,7 @@ class SearchViewModel : BaseViewModel() {
 
     fun updateModel(function: (SearchScreenState) -> Unit) {
         function(_state.value)
-        val searchBarText = getSearchBarText(_state.value)
+        val searchBarText = getSearchBarText()
         _state.update { it.copy(ref = it.ref + 1, searchBarText = searchBarText) }
     }
 
@@ -189,7 +189,7 @@ class SearchViewModel : BaseViewModel() {
             // 从 Site 表获取所有站点配置
             val allSites = Db.database.getSiteDao().getAllSites().firstOrNull() ?: emptyList()
 
-            log.debug("从数据库加载站点配置: $allSites")
+            log.debug("从数据库加载站点配置: {}", allSites)
 
             // 创建新的站点列表，根据数据库配置更新状态
             val updatedSites = _state.value.searchableSites.map { site ->

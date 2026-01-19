@@ -3,6 +3,7 @@ package com.corner.server.plugins
 import cn.hutool.core.io.file.FileNameUtil
 import com.corner.server.logic.proxy
 import com.corner.ui.scene.SnackBar
+import com.corner.util.m3u8.M3U8Cache
 import com.corner.util.toSingleValueMap
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -174,7 +175,7 @@ suspend fun errorResp(call: ApplicationCall) {
 
 suspend fun errorResp(call: ApplicationCall, msg: String) {
     call.respondText(
-        text = HttpStatusCode.InternalServerError.description,
+        text = msg,
         contentType = ContentType.Application.OctetStream,
         status = HttpStatusCode.InternalServerError
     ) {}

@@ -16,7 +16,7 @@ val Jsons = Json {
 
 object ToStringSerializer: JsonTransformingSerializer<String>(String.serializer()) {
     override fun transformDeserialize(element: JsonElement): JsonElement {
-        val s = element.toString().trim({c -> c == '"' })
+        val s = element.toString().trim { c -> c == '"' }
         return JsonPrimitive(s)
     }
 }

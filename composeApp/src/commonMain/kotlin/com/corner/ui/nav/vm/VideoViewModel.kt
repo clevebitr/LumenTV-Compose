@@ -38,7 +38,7 @@ class VideoViewModel : BaseViewModel() {
 
     init {
         scope.launch {
-            GlobalAppState.home.collect {
+            home.collect {
                 homeLoad()
             }
         }
@@ -67,6 +67,7 @@ class VideoViewModel : BaseViewModel() {
             )
         }
     }
+
     private var loadJob: Job? = null
     fun homeLoad(forceRefresh: Boolean = false) {
         //取消前一个任务
@@ -107,7 +108,10 @@ class VideoViewModel : BaseViewModel() {
                     if (list.isEmpty()) {
                         if (classList.isEmpty()) {
                             log.debug("没有可用的分类")
-                            SnackBar.postMsg("没有可用的分类,请尝试切换站源或重新加载", type = SnackBar.MessageType.WARNING)
+                            SnackBar.postMsg(
+                                "没有可用的分类,请尝试切换站源或重新加载",
+                                type = SnackBar.MessageType.WARNING
+                            )
                             isLoading.value = false
                             return@launch
                         }
@@ -117,7 +121,10 @@ class VideoViewModel : BaseViewModel() {
 
                         if (!result.isSuccess || result.list.isEmpty()) {
                             log.debug("加载分类内容失败")
-                            SnackBar.postMsg("加载分类内容失败,请尝试切换站源或重新加载", type = SnackBar.MessageType.WARNING)
+                            SnackBar.postMsg(
+                                "加载分类内容失败,请尝试切换站源或重新加载",
+                                type = SnackBar.MessageType.WARNING
+                            )
                             isLoading.value = false
                             return@launch
                         }
@@ -258,7 +265,7 @@ class VideoViewModel : BaseViewModel() {
                     idx++
                     delay(2000)
                 }
-            } catch (e: CancellationException) {
+            } catch (_: CancellationException) {
                 // 正常取消不记录错误
                 _state.update { it.copy(isRunning = false) }
             } catch (e: Exception) {

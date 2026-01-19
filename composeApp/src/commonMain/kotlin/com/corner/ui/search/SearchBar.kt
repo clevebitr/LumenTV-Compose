@@ -1,6 +1,5 @@
 package com.corner.ui.search
 
-import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
@@ -54,8 +53,7 @@ fun SearchBar(
     focusRequester: FocusRequester = remember { FocusRequester() },
     initValue: String,
     onSearch: (String) -> Unit,
-    isSearching: Boolean,
-    onFocusRequested: () -> Unit = { focusRequester.requestFocus() }
+    isSearching: Boolean
 ) {
     var focusState by remember { mutableStateOf<FocusState?>(null) }
     val modelState = vm.state.collectAsState()
@@ -160,7 +158,7 @@ fun SearchBar(
                                     val body = response.bodyAsText()
                                     suggestions = Suggest.objectFrom(body)
                                 }
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                             } finally {
                                 isGettingSuggestion = false
                             }

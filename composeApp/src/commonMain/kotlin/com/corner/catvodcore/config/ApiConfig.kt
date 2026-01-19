@@ -71,10 +71,6 @@ object ApiConfig {
             val apiConfig = Jsons.decodeFromString<Api>(data)
             val updatedApi = apiConfig.copy(url = cfg.url, data = data, cfg = cfg, ref = apiConfig.ref + 1)
             apiFlow.update { updatedApi }
-//            apiFlow.update { apiConfig }
-//            apiFlow.update { ap ->
-//                ap.copy(url = cfg.url, data = data, cfg = cfg, ref = ap.ref + 1)
-//            }
 
             api = updatedApi
 
@@ -177,7 +173,7 @@ object ApiConfig {
             if (isJson) {
                 return Jsons.decodeFromString(str)
             } else if (str.startsWith("http")) {
-                return Http.Get(str, connectTimeout = 60, readTimeout = 60)
+                return Http.get(str, connectTimeout = 60, readTimeout = 60)
                     .execute()
                     .use { response ->
                         response.body.string()

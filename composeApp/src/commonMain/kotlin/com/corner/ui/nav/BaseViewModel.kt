@@ -9,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 
 abstract class BaseViewModel(dispatcher: CoroutineDispatcher = Dispatchers.Default):ViewModel() {
     val scope: CoroutineScope by lazy {
-        // 使用全局的 CoroutineScope，最好保持适当整合
         CoroutineScope(GlobalAppState.rootScope.coroutineContext + dispatcher)
     }
     val log: org.slf4j.Logger = thisLogger()

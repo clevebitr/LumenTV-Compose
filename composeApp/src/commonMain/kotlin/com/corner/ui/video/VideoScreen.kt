@@ -201,14 +201,14 @@ fun WindowScope.VideoScene(
                 VideoTopBar(
                     vm = vm,
                     onClickSearch = { onClickSwitch(Menu.SEARCH) },
-                    onClickChooseHome = { showChooseHome = true },
+                    onClickChooseHome = { !showChooseHome },
                     onClickSetting = { onClickSwitch(Menu.SETTING) },
                     onClickHistory = { onClickSwitch(Menu.HISTORY) })
             }
         },
         floatingActionButton = {
             FloatButton(vm, state, scope, showFiltersDialog) {
-                showFiltersDialog = !showFiltersDialog
+                !showFiltersDialog
             }
         }
     ) {
@@ -794,7 +794,7 @@ fun ChooseHomeDialog(
                                         isTestingAll = false
                                     } else {
                                         isTestingAll = true
-                                        SpiderTestUtil.testAllSpiders { siteKey, status ->
+                                        SpiderTestUtil.testAllSpiders { _, status ->
                                             // 不再需要手动更新 spiderStatusMap，因为 SpiderTestUtil 会自动更新状态流
                                             if (status != SpiderTestUtil.SpiderStatus.TESTING) {
                                                 val allCompleted =

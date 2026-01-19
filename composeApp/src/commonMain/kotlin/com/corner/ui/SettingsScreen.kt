@@ -864,7 +864,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                     val proxySetting = derivedStateOf {
                         model.value.settingList.getSetting(SettingType.PROXY)
                             ?.value?.parseAsSettingEnable()
-                            ?: SettingEnable.Default()
+                            ?: SettingEnable.default()
                     }
 
                     Row(

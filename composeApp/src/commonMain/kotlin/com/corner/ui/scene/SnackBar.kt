@@ -211,11 +211,7 @@ object SnackBar {
 
                             IconButton(
                                 onClick = {
-                                    animatedVisibility = false
-                                    scope.launch {
-                                        delay(400)
-                                        stateFlow.value = null
-                                    }
+                                    stateFlow.value = null
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {

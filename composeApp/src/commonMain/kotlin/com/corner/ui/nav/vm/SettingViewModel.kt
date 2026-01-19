@@ -54,8 +54,7 @@ class SettingViewModel : BaseViewModel() {
         scope.launch {
             _updateCheckState.update { it.copy(isChecking = true, error = null) }
             try {
-                val result = UpdateManager.checkForUpdate()
-                when (result) {
+                when (val result = UpdateManager.checkForUpdate()) {
                     is UpdateResult.Available -> {
                         _updateCheckState.update {
                             it.copy(
@@ -107,10 +106,6 @@ class SettingViewModel : BaseViewModel() {
                 }
             }
         }
-    }
-
-    fun resetUpdateCheckState() {
-        _updateCheckState.value = UpdateCheckState()
     }
 }
 

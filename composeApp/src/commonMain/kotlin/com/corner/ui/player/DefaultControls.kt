@@ -1,6 +1,6 @@
 package com.corner.ui.player
 
-import PlayerControlsTheme
+import com.corner.ui.theme.PlayerControlsTheme
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -28,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -98,7 +99,7 @@ fun DefaultControls(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // 进度条
-                androidx.compose.material3.Slider(
+                Slider(
                     value = animatedTimestamp,
                     onValueChange = { controller.seekTo(it.roundToLong()) },
                     valueRange = 0f..playerState.duration.toFloat(),

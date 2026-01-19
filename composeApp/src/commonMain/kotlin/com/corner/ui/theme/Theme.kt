@@ -1,3 +1,5 @@
+package com.corner.ui.theme
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -74,7 +76,7 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun AppTheme(
-    content: @Composable() () -> Unit
+    content: @Composable () -> Unit
 ) {
     val isDarkThemeState = GlobalAppState.isDarkTheme.collectAsState()
     val isDarkTheme = isDarkThemeState.value

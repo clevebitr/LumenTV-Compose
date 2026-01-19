@@ -37,6 +37,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 
+@Suppress("unused")
 @Composable
 fun ExpandedText(text: String, maxLine: Int, textStyle: TextStyle = TextStyle()) {
     var expanded by remember { mutableStateOf(false) }
@@ -45,7 +46,7 @@ fun ExpandedText(text: String, maxLine: Int, textStyle: TextStyle = TextStyle())
             text = text,
             maxLines = if (expanded) Int.MAX_VALUE else maxLine,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable(onClick = { expanded = !expanded }),
+            modifier = Modifier.clickable(onClick = { !expanded }),
             style = textStyle
         )
     }
@@ -141,9 +142,8 @@ fun TopEmptyShow(
     title: String = "没有找到内容",
     subtitle: String = "请检查网络连接或稍后再试",
     isLoading: Boolean? = false,
-    showIcon: Boolean? = false, // 默认不显示图标
-    buttonAlignment: ButtonAlignment = ButtonAlignment.CENTER,
-    showRefresh: Boolean? = true, // 默认显示刷新按钮
+    showIcon: Boolean? = false,     // 默认不显示图标
+    showRefresh: Boolean? = true,   // 默认显示刷新按钮
 ) {
     Column(
         modifier = modifier
@@ -159,23 +159,11 @@ fun TopEmptyShow(
             onRefresh = onRefresh,
             isLoading = isLoading,
             showIcon = showIcon,
-            buttonAlignment = buttonAlignment,
             textAlignment = TextAlignmentOption.LEFT,
             isTopBar = true,
             showRefresh = showRefresh
         )
     }
-}
-
-/*
-* 使用isLoading = true设置加载状态
-* */
-
-// 按钮的对齐方式
-enum class ButtonAlignment {
-    LEFT,
-    CENTER,
-    RIGHT
 }
 
 // 定义文字对齐方式
@@ -192,14 +180,9 @@ fun EmptyState(
     title: String = "这里什么都没有...",
     subtitle: String? = null,
     isLoading: Boolean? = false,
-    showIcon: Boolean? = true, // 默认显示图标
-    // 按钮对齐方式参数，默认居中
-    buttonAlignment: ButtonAlignment = ButtonAlignment.CENTER,
-    // 新增文字对齐方式参数，默认左对齐
+    showIcon: Boolean? = true,
     textAlignment: TextAlignmentOption = TextAlignmentOption.LEFT,
-    // 新增参数，用于区分是否为顶栏显示
     isTopBar: Boolean = false,
-    // 新增参数，用于区分是否显示刷新按钮
     showRefresh: Boolean? = true
 ) {
     val paddingValue = if (isTopBar) 1.dp else 24.dp
@@ -484,7 +467,7 @@ fun HoverableText(text: String, style: TextStyle = TextStyle(), onClick: () -> U
             end = text.length
         )
         addLink(
-            LinkAnnotation.Clickable("hoverable_text_tag") { offset ->
+            LinkAnnotation.Clickable("hoverable_text_tag") { _ ->
                 onClick()
             },
             start = 0,

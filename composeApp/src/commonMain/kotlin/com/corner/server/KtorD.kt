@@ -13,7 +13,7 @@ private val log = LoggerFactory.getLogger("KtorD")
 
 object KtorD {
 
-    var ports: Int = -1;
+    var ports: Int = -1
 
     var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 

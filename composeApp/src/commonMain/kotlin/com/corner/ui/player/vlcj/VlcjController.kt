@@ -44,7 +44,7 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     override var showTip = MutableStateFlow(false)
     override var tip = MutableStateFlow("")
     override var history: MutableStateFlow<History?> = MutableStateFlow(null)
-    private val defferredEffects = mutableListOf<(MediaPlayer) -> Unit>()
+    private val deferredEffects = mutableListOf<(MediaPlayer) -> Unit>()
     private var isAccelerating = false
     private var originSpeed = 1.0F
     private var currentSpeed = 1.0F
@@ -57,7 +57,7 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     private var playerStartTime: Long = 0
     private var playerRealStartTime: Long = 0   // 记录实际开始播放的时间
     private var playerEndTime: Long = 0
-    private val decodeFailureTureShold = 5000L  // 5秒阈值
+    private val decodeFailureTureShould = 5000L  // 5秒阈值
 
     companion object {
         private var pluginCacheChecked = false  // 插件缓存检查
@@ -87,17 +87,17 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         player?.let {
             block(it)
         } ?: run {
-            defferredEffects.add(block)
+            deferredEffects.add(block)
         }
     }
 
     override fun onMediaPlayerReady(mediaPlayer: EmbeddedMediaPlayer) {
         this.player = mediaPlayer
         _state.update { it.copy(duration = player?.status()?.length() ?: 0L) }
-        defferredEffects.forEach { block ->
+        deferredEffects.forEach { block ->
             block(mediaPlayer)
         }
-        defferredEffects.clear()
+        deferredEffects.clear()
     }
 
     private val stateListener = object : MediaPlayerEventAdapter() {
@@ -187,8 +187,8 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
             playerRealStartTime = 0
 
             // 如果播放时长小于阈值，认为是解码失败，切换线路
-            if (playDuration < decodeFailureTureShold) {
-                log.warn("播放时长过短 (${playDuration}ms < ${decodeFailureTureShold}ms)，可能是解码失败，切换线路")
+            if (playDuration < decodeFailureTureShould) {
+                log.warn("播放时长过短 (${playDuration}ms < ${decodeFailureTureShould}ms)，可能是解码失败，切换线路")
                 vm.nextFlag()
                 return
             }
@@ -352,7 +352,7 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
             }
             // 取消scope和清理其他资源
             scope.cancel("异步停止播放")
-            defferredEffects.clear()
+            deferredEffects.clear()
             log.debug("异步清理资源完成!")
         } catch (e: Exception) {
             log.warn("异步清理资源异常: ${e.message}")
@@ -500,7 +500,7 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     override fun dispose() = catch {
         log.debug("dispose - 释放播放器资源")
         scope.cancel()
-        defferredEffects.clear()
+        deferredEffects.clear()
         player?.events()?.removeMediaPlayerEventListener(stateListener)
         player?.release()
         factory.release()

@@ -42,11 +42,11 @@ class TvAvTransportService : AbstractAVTransportService() {
         val currentURI = runBlocking { GlobalAppState.DLNAUrl.value }
 
         return MediaInfo(
-            currentURI,           // currentURI
-            "",                   // currentURIMetaData (元数据，可以为空)
-            UnsignedIntegerFourBytes(1), // numberOfTracks (轨道数)
-            "00:00:00",          // mediaDuration (媒体时长，格式为HH:mm:ss)
-            StorageMedium.NONE   // playMedium (播放介质)
+            currentURI,                     // currentURI
+            "",                             // currentURIMetaData (元数据，可以为空)
+            UnsignedIntegerFourBytes(1),    // numberOfTracks (轨道数)
+            "00:00:00",                     // mediaDuration (媒体时长，格式为HH:mm:ss)
+            StorageMedium.NONE              // playMedium (播放介质)
         )
     }
 
@@ -90,25 +90,25 @@ class TvAvTransportService : AbstractAVTransportService() {
             val durationFormatted = formatTime(durationSec)
 
             return PositionInfo(
-                1,                      // track (轨道号)
-                durationFormatted,      // trackDuration (轨道时长)
-                "", // trackMetaData (轨道元数据)
+                1,                          // track (轨道号)
+                durationFormatted,          // trackDuration (轨道时长)
+                "",                         // trackMetaData (轨道元数据)
                 state.mediaInfo?.url ?: "", // trackURI (轨道URI)
-                currentTimeFormatted,   // relTime (相对时间)
-                currentTimeFormatted,   // absTime (绝对时间)
-                0,                      // relCount (相对计数)
-                0                       // absCount (绝对计数)
+                currentTimeFormatted,       // relTime (相对时间)
+                currentTimeFormatted,       // absTime (绝对时间)
+                0,                          // relCount (相对计数)
+                0                           // absCount (绝对计数)
             )
         }
 
         // 默认返回空的PositionInfo
         return PositionInfo(
             0,                      // track
-            "00:00:00",            // trackDuration
+            "00:00:00",             // trackDuration
             "",                     // trackMetaData
             "",                     // trackURI
-            "00:00:00",            // relTime
-            "00:00:00",            // absTime
+            "00:00:00",             // relTime
+            "00:00:00",             // absTime
             0,                      // relCount
             0                       // absCount
         )

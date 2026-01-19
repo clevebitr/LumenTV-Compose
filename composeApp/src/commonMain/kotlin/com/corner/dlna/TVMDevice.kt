@@ -21,9 +21,7 @@ class TVMDevice
     DeviceDetails("LumenTV-Compose"),
     createIcons(),
     createService(),
-) {
-
-}
+)
 
 @OptIn(ExperimentalResourceApi::class)
 fun createIcons(): Array<Icon> {
@@ -62,9 +60,10 @@ fun createIcons(): Array<Icon> {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun createService(): Array<LocalService<*>>{
-    val service = AnnotationLocalServiceBinder().read(TVConnectionManagerService::class.java) as LocalService<TVConnectionManagerService>
-    service.manager = object : DefaultServiceManager<TVConnectionManagerService>(service, null){
+fun createService(): Array<LocalService<*>> {
+    val service =
+        AnnotationLocalServiceBinder().read(TVConnectionManagerService::class.java) as LocalService<TVConnectionManagerService>
+    service.manager = object : DefaultServiceManager<TVConnectionManagerService>(service, null) {
         override fun getLockTimeoutMillis(): Int {
             return LOCK_TIMEOUT
         }
@@ -73,12 +72,11 @@ fun createService(): Array<LocalService<*>>{
             return TVConnectionManagerService()
         }
     }
-//    services[0] = service
 
     val transport =
         AnnotationLocalServiceBinder().read(TvAvTransportService::class.java) as LocalService<TvAvTransportService>
 
-    transport.manager = object : DefaultServiceManager<TvAvTransportService>(transport, null){
+    transport.manager = object : DefaultServiceManager<TvAvTransportService>(transport, null) {
 
         override fun getLockTimeoutMillis(): Int {
             return LOCK_TIMEOUT
@@ -96,7 +94,8 @@ private const val LOCK_TIMEOUT = 5000
 
 @Suppress("UNCHECKED_CAST")
 private fun createRenderingControl(): LocalService<AbstractAudioRenderingControl> {
-    val renderingControlService: LocalService<AbstractAudioRenderingControl> = AnnotationLocalServiceBinder().read(AbstractAudioRenderingControl::class.java) as LocalService<AbstractAudioRenderingControl>
+    val renderingControlService: LocalService<AbstractAudioRenderingControl> =
+        AnnotationLocalServiceBinder().read(AbstractAudioRenderingControl::class.java) as LocalService<AbstractAudioRenderingControl>
     renderingControlService.setManager(object :
         DefaultServiceManager<AbstractAudioRenderingControl>(renderingControlService, null) {
         override fun getLockTimeoutMillis(): Int {

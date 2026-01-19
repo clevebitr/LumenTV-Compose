@@ -62,9 +62,8 @@ class Http {
             )
         }
 
-        //获取HostnameVerifier
         fun getHostnameVerifier(): HostnameVerifier {
-            return HostnameVerifier { s: String?, sslSession: SSLSession? -> true }
+            return HostnameVerifier { _: String?, _: SSLSession? -> true }
         }
 
         fun getX509TrustManager(): X509TrustManager? {
@@ -123,12 +122,13 @@ class Http {
 
         fun resetDoh() {
             log.info("[DNS Setting]Resetting DoH to system DNS")
-            Companion.doh = null
+            doh = null
             client?.dispatcher?.executorService?.shutdownNow()
             client = builder.build()
             log.info("[DNS Setting]DoH reset to system DNS successfully")
         }
 
+        @Suppress("unused")
         fun setProxy(proxy: String) {
             ProxySelect.setDefault(getSelector(proxy))
         }
@@ -158,14 +158,13 @@ class Http {
         }
 
         @JvmOverloads
-        fun Get(
+        fun get(
             url: String,
             params: Map<String, String?>? = null,
             headers: Headers? = null,
             connectTimeout: Long = 15, // 新增参数
             readTimeout: Long = 15     // 新增参数
         ): Call {
-            // 1. 构建URL和Request（保持原逻辑）
             val httpUrl = url.toHttpUrlOrNull()!!.newBuilder().apply {
                 params?.forEach { (name, value) ->
                     addQueryParameter(name, value)
@@ -178,7 +177,6 @@ class Http {
                 .apply { checkBaseAuth(httpUrl, this) }
                 .build()
 
-            // 仅在需要自定义超时时创建新Client
             return if (connectTimeout != 15L || readTimeout != 15L) {
                 client().newBuilder()
                     .connectTimeout(connectTimeout, TimeUnit.SECONDS)
@@ -186,11 +184,12 @@ class Http {
                     .build()
                     .newCall(request)
             } else {
-                client().newCall(request) // 默认使用原有Client
+                client().newCall(request)
             }
         }
 
-        fun Post(url: String, params: Map<String, String>?, headers: Headers?): Call {
+        @Suppress("unused")
+        fun post(url: String, params: Map<String, String>?, headers: Headers?): Call {
             val builder: HttpUrl.Builder = url.toHttpUrlOrNull()!!.newBuilder()
             val httpUrl: HttpUrl = builder.build()
             val request: Request.Builder = Request.Builder()

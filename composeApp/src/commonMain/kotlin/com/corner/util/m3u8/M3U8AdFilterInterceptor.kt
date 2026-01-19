@@ -1,6 +1,5 @@
 package com.corner.util.m3u8
 
-import M3U8Filter
 import com.corner.bean.SettingStore
 import com.corner.ui.scene.SnackBar
 import okhttp3.Response
@@ -30,7 +29,7 @@ class M3U8AdFilterInterceptor {
             val response = chain.proceed(request)
             if (!response.isSuccessful) return response
 
-            val originalContent = response.body?.string() ?: return response
+            val originalContent = response.body.string()
 
             // 1. 转换相对路径
             val baseUrl = url.substringBeforeLast("/") + "/"
@@ -58,7 +57,7 @@ class M3U8AdFilterInterceptor {
 
             // 3. 直接返回处理后的内容（不再走代理）
             return response.newBuilder()
-                .body(filteredContent.toResponseBody(response.body?.contentType()))
+                .body(filteredContent.toResponseBody(response.body.contentType()))
                 .build()
         }
     }

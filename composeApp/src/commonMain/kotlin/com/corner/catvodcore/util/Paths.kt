@@ -8,18 +8,16 @@ import java.io.File
 import java.nio.file.Path
 
 object Paths {
-//    private val runPath = System.getProperty("user.dir")
-    private val classPath = System.getProperty("java.class.path")
-    private const val APPNAME = "Lumen-TV"
+    private const val APP_NAME = "Lumen-TV"
     private val log = LoggerFactory.getLogger("Paths")
 
     private val userDataDir = getUserDataDir()
 
     private fun getUserDataDir() = run {
         when (UserDataDirProvider.currentOs) {
-            OperatingSystem.Windows -> File(System.getenv("AppData"), "$APPNAME/cache")
-            OperatingSystem.Linux -> File(System.getProperty("user.home"), ".cache/$APPNAME")
-            OperatingSystem.MacOS -> File(System.getProperty("user.home"), "Library/Caches/$APPNAME")
+            OperatingSystem.Windows -> File(System.getenv("AppData"), "$APP_NAME/cache")
+            OperatingSystem.Linux -> File(System.getProperty("user.home"), ".cache/$APP_NAME")
+            OperatingSystem.MacOS -> File(System.getProperty("user.home"), "Library/Caches/$APP_NAME")
             OperatingSystem.Unknown -> throw RuntimeException("未知操作系统")
         }
     }
@@ -50,7 +48,6 @@ object Paths {
     fun db():String{
         val path = userDataRoot().resolve("db").check().resolve("tv.db")
         return path.path
-//        return "jdbc:sqlite:${path}"
     }
 
     fun local(jar: String): File {

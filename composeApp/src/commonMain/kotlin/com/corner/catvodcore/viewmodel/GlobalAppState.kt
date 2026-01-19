@@ -24,9 +24,9 @@ object GlobalAppState {
     })
     var showProgress = MutableStateFlow(false)
     val hotList = MutableStateFlow(listOf<HotData>())
-    val chooseVod = mutableStateOf<Vod>(Vod())
+    val chooseVod = mutableStateOf(Vod())
 
-    val home = MutableStateFlow<Site>(Site.get("", ""))
+    val home = MutableStateFlow(Site.get("", ""))
 
     val clear = MutableStateFlow(false)
     val closeApp = MutableStateFlow(false)
@@ -86,5 +86,5 @@ object GlobalAppState {
     }
 }
 enum class DetailFromPage {
-    SEARCH, DLNA, HOME
+    SEARCH, HOME
 }
