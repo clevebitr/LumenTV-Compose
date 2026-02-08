@@ -84,7 +84,7 @@
 - 运行 `LumenTV-Compose.exe` 自动检查更新
 - 通过设置页手动检查更新
 ### ❗强烈建议阅读自更新说明文档：
-[查看自更新说明文档](https://github.com/clevebitr/LumenTV-Compose/blob/main/Updater/README.md)
+[查看自更新说明文档](https://github.com/clevebitr/LumenTV-Compose/blob/main/updater/README.md)
 
 ## 关于讨论群
 本项目无讨论群！不要在原项目 tg 群里提及有关该项目问题！
