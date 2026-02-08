@@ -5,6 +5,8 @@ import com.corner.bean.SettingStore
 import com.corner.catvodcore.bean.Collect
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.catvodcore.viewmodel.GlobalAppState
+import com.corner.catvodcore.viewmodel.SiteViewModel.viewModelScope
+import com.corner.database.Db
 import com.corner.ui.nav.BaseViewModel
 import com.corner.ui.nav.data.SearchScreenState
 import com.corner.ui.scene.SnackBar
@@ -12,19 +14,22 @@ import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CopyOnWriteArraySet
 
 
-class SearchViewModel: BaseViewModel() {
+class SearchViewModel : BaseViewModel() {
     private val _state = MutableStateFlow(SearchScreenState())
-    val state:StateFlow<SearchScreenState> = _state
+    val state: StateFlow<SearchScreenState> = _state
 
-    private var jobList: MutableList<Job> = mutableListOf<Job>()
+    private var jobList: MutableList<Job> = mutableListOf()
 
     private val supervisorJob = SupervisorJob()
     private val searchScope: CoroutineScope = CoroutineScope(Dispatchers.Default.limitedParallelism(8) + supervisorJob)
-    
+    private var hasLoadedDbConfig = false
+
     fun onSearch(keyword: String) {
         _state.update { it.copy(keyword = keyword) }
     }
@@ -39,8 +44,12 @@ class SearchViewModel: BaseViewModel() {
         _state.update { it.copy(hotList = GlobalAppState.hotList.value, historyList = SettingStore.getHistoryList()) }
 
         scope.launch {
-            _state.collect() {
-                _state.update { it.copy(searchBarText = getSearchBarText(_state.value)) }
+            loadSearchConfig()
+        }
+
+        scope.launch {
+            _state.collect {
+                _state.update { it.copy(searchBarText = getSearchBarText()) }
             }
         }
     }
@@ -50,7 +59,7 @@ class SearchViewModel: BaseViewModel() {
         supervisorJob.cancelChildren(CancellationException("onDestroy"))
     }
 
-    private fun getSearchBarText(model: SearchScreenState): String {
+    private fun getSearchBarText(): String {
         val size = _state.value.searchableSites.filter { it.isSearchable() }.size
         if (_state.value.isSearching) return "${_state.value.searchCompleteSites.size}/$size"
         return "$size"
@@ -76,14 +85,19 @@ class SearchViewModel: BaseViewModel() {
             clear()
         }
         _state.update { it.copy(isSearching = true) }
-        SiteViewModel.viewModelScope.launch {
+        viewModelScope.launch {
             SettingStore.addSearchHistory(searchText)
             var searchableSites =
-                _state.value.searchableSites.filter { it.searchable == 1 && !_state.value.searchCompleteSites.contains(it.key) }
+                _state.value.searchableSites.filter {
+                    it.searchable == 1 && !_state.value.searchCompleteSites.contains(
+                        it.key
+                    )
+                }
                     .shuffled()
-            searchableSites = searchableSites.subList(0, _state.value.onceSearchSiteNum.coerceAtMost(searchableSites.size))
+            searchableSites =
+                searchableSites.subList(0, _state.value.onceSearchSiteNum.coerceAtMost(searchableSites.size))
             log.info("站源：{}", searchableSites.map { it.name })
-            if(searchableSites.map { it.name }.isEmpty()){
+            if (searchableSites.map { it.name }.isEmpty()) {
                 SnackBar.postMsg("所有站点已搜索完毕，未找到新内容", type = SnackBar.MessageType.WARNING)
             }
             searchableSites.forEach { site ->
@@ -148,8 +162,73 @@ class SearchViewModel: BaseViewModel() {
 
     fun updateModel(function: (SearchScreenState) -> Unit) {
         function(_state.value)
-        val searchBarText = getSearchBarText(_state.value)
+        val searchBarText = getSearchBarText()
         _state.update { it.copy(ref = it.ref + 1, searchBarText = searchBarText) }
     }
 
+    fun saveSearchConfigToDb(siteKey: String, isSearchable: Boolean) {
+        viewModelScope.launch {
+            try {
+                Db.database.getSiteDao().updateSearchable(
+                    siteKey = siteKey,
+                    searchable = if (isSearchable) 1L else 0L
+                )
+                log.debug("保存搜索配置成功：{}/{}", siteKey, isSearchable)
+            } catch (e: Exception) {
+                log.error("保存搜索配置失败: {}", e.message)
+                SnackBar.postMsg("保存搜索配置失败: ${e.message}", type = SnackBar.MessageType.ERROR)
+            }
+        }
+    }
+
+    private suspend fun loadSearchConfig() {
+        if (hasLoadedDbConfig) return
+        hasLoadedDbConfig = true
+
+        try {
+            // 从 Site 表获取所有站点配置
+            val allSites = Db.database.getSiteDao().getAllSites().firstOrNull() ?: emptyList()
+
+            log.debug("从数据库加载站点配置: {}", allSites)
+
+            // 创建新的站点列表，根据数据库配置更新状态
+            val updatedSites = _state.value.searchableSites.map { site ->
+                val dbSite = allSites.find { it.key == site.key }
+                if (dbSite != null) {
+                    // 创建新站点对象以确保Compose能检测到变化
+                    site.copy(searchable = dbSite.searchable?.toInt() ?: 1)
+                } else {
+                    site
+                }
+            }
+
+            // 更新整个站点列表
+            _state.update { currentState ->
+                currentState.copy(
+                    searchableSites = CopyOnWriteArraySet(updatedSites),
+                    ref = currentState.ref + 1
+                )
+            }
+        } catch (e: Exception) {
+            println("加载搜索配置失败: ${e.message}")
+        }
+    }
+
+    fun updateAllSearchConfigs(isSearchable: Boolean) {
+        viewModelScope.launch {
+            try {
+                // 获取当前所有站点并批量更新数据库
+                _state.value.searchableSites.forEach { site ->
+                    Db.database.getSiteDao().updateSearchable(
+                        siteKey = site.key,
+                        searchable = if (isSearchable) 1L else 0L
+                    )
+                }
+                log.debug("批量更新搜索配置成功")
+            } catch (e: Exception) {
+                log.error("批量更新搜索配置失败: {}", e.message)
+                SnackBar.postMsg("批量更新搜索配置失败: ${e.message}", type = SnackBar.MessageType.ERROR)
+            }
+        }
+    }
 }

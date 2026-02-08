@@ -42,16 +42,27 @@ class UpdateLauncher {
 
                 when (UserDataDirProvider.currentOs) {
                     OperatingSystem.Windows -> {
-                        processBuilder.command(
-                            "powershell",
-                            "-Command",
-                            "Start-Process",
-                            "cmd.exe",
-                            "-ArgumentList",
-                            "\"/c\", \"\\\"${updaterFile.absolutePath}\\\"\", \"-path\", \"${currentDir}\", \"-file\", \"${tempZipFile.absolutePath}\"",
-                            "-Verb",
-                            "RunAs"
+                        val tempDir = System.getProperty("java.io.tmpdir")
+                        val batchFile = File(tempDir, "update_${System.currentTimeMillis()}.bat")
+
+                        batchFile.writeText(
+                            """
+                            @echo off
+                            echo Stopping main application...
+                            taskkill /f /im "javaw.exe" /fi "WINDOWTITLE eq *LumenTV*" 2>nul
+                            timeout /t 2 /nobreak >nul
+                            echo Starting LumenTV Update...
+                            "${updaterFile.absolutePath}" -path "${currentDir}" -file "${tempZipFile.absolutePath}"
+                            if %ERRORLEVEL% EQU 0 (
+                                echo Update completed successfully!
+                            ) else (
+                                echo Update failed!
+                            )
+                            echo Press any key to continue...
+                            pause >nul
+                            """.trimIndent()
                         )
+                        processBuilder.command("cmd", "/c", "start", "cmd", "/k", "\"${batchFile.absolutePath}\"")
                     }
 
                     OperatingSystem.Linux -> {

@@ -2,10 +2,8 @@ import androidx.compose.foundation.DarkDefaultContextMenuRepresentation
 import androidx.compose.foundation.LightDefaultContextMenuRepresentation
 import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -24,6 +22,7 @@ import com.corner.util.update.UpdateDownloader
 import com.corner.util.update.UpdateLauncher
 import com.corner.util.update.UpdateManager
 import com.corner.util.update.UpdateResult
+import com.corner.util.update.fetchChangelogFromUrl
 import com.seiko.imageloader.LocalImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,6 +34,7 @@ import java.io.File
 import java.awt.Dimension
 
 private val log = LoggerFactory.getLogger("main")
+private const val CHANGE_LOG_URL = "https://raw.githubusercontent.com/clevebitr/LumenTV-Compose/refs/heads/main/CHANGELOG.md"
 
 fun main() {
     launchErrorCatcher()
@@ -51,6 +51,8 @@ fun main() {
         var showUpdateDialog by remember { mutableStateOf(false) }
         var updateResult by remember { mutableStateOf<UpdateResult.Available?>(null) }
         var downloadProgress by remember { mutableStateOf<DownloadProgress?>(null) }
+        var changelog by remember { mutableStateOf<String?>(null) }
+        var isLoadingChangelog by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             launch(Dispatchers.Default) {
@@ -60,6 +62,14 @@ fun main() {
                 val result = UpdateManager.checkForUpdate()
                 if (result is UpdateResult.Available) {
                     updateResult = result
+                    isLoadingChangelog = true
+                    changelog = try {
+                        fetchChangelogFromUrl(CHANGE_LOG_URL)
+                    } catch (e: Exception) {
+                        "无法获取更新日志: ${e.message}"
+                    } finally {
+                        isLoadingChangelog = false
+                    }
                     showUpdateDialog = true
                 }
             }
@@ -105,34 +115,45 @@ fun main() {
                         showUpdateDialog = false
                         downloadProgress = null
                     },
+                    changelog = changelog,
+                    isLoadingChangelog = isLoadingChangelog,
+                    onNoRemind = {
+                        UpdateManager.setNoRemindForVersion(updateResult!!.latestVersion)
+                        showUpdateDialog = false
+                        downloadProgress = null
+                    },
                     onUpdate = {
                         scope.launch(Dispatchers.IO) {
-                            downloadProgress = DownloadProgress.Starting
+                            log.info("Starting update process")
                             val tempDir = System.getProperty("java.io.tmpdir")
                             val zipFile = File(tempDir, "LumenTV-update.zip")
 
-                            try {
-                                if (zipFile.exists()) {
+                            if (zipFile.exists()) {
+                                log.info("Update file already exists, launching updater directly")
+                                scope.launch {
+                                    UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
+                                    UpdateLauncher.exitApplication()
+                                }
+                                return@launch
+                            }
+
+                            log.info("Starting download using downloadUpdate function")
+                            UpdateDownloader.downloadUpdate(
+                                updateResult!!.downloadUrl,
+                                zipFile
+                            ).collect { progress ->
+                                log.info("Received progress update: ${progress::class.simpleName}")
+                                downloadProgress = progress
+                                if (progress is DownloadProgress.Completed) {
+                                    log.info("Download completed, launching updater")
                                     scope.launch {
                                         UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
                                         UpdateLauncher.exitApplication()
                                     }
-                                    return@launch
+                                } else if (progress is DownloadProgress.Failed) {
+                                    log.error("下载更新失败: {}", progress.error)
                                 }
-                                UpdateDownloader.downloadUpdateSync(
-                                    updateResult!!.downloadUrl,
-                                    zipFile
-                                ).onSuccess {
-                                    downloadProgress = DownloadProgress.Completed(zipFile)
-                                    scope.launch {
-                                        UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
-                                        UpdateLauncher.exitApplication()
-                                    }
-                                }.onFailure { e ->
-                                    downloadProgress = DownloadProgress.Failed(e.message ?: "下载失败")
-                                }
-                            } catch (e: Exception) {
-                                downloadProgress = DownloadProgress.Failed(e.message ?: "下载失败")
+                                log.info("Finished collecting download progress")
                             }
                         }
                     }

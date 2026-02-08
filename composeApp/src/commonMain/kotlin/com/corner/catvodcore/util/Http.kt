@@ -2,6 +2,7 @@ package com.corner.catvodcore.util
 
 import com.corner.util.network.KtorClient
 import com.github.catvod.bean.Doh
+import org.slf4j.LoggerFactory
 import kotlinx.serialization.json.Json
 import okhttp3.*
 import okhttp3.Credentials.basic
@@ -23,9 +24,9 @@ import java.util.logging.Level
 
 class Http {
     companion object {
-        // 在 Companion object 中初始化日志级别
+        private val log = LoggerFactory.getLogger(Http::class.java)
+
         init {
-            // 设置 OkHttpClient 的日志级别为 FINE
             Logger.getLogger(OkHttpClient::class.java.name).level = Level.FINE
         }
 
@@ -61,9 +62,8 @@ class Http {
             )
         }
 
-        //获取HostnameVerifier
         fun getHostnameVerifier(): HostnameVerifier {
-            return HostnameVerifier { s: String?, sslSession: SSLSession? -> true }
+            return HostnameVerifier { _: String?, _: SSLSession? -> true }
         }
 
         fun getX509TrustManager(): X509TrustManager? {
@@ -92,23 +92,23 @@ class Http {
                     .hostnameVerifier((getHostnameVerifier()))
 //                    .callTimeout(Duration.of(3, ChronoUnit.SECONDS))
                     .dispatcher(dispatcher)
-                    .dns(dns())
+                    .dns(dns("OkHttpClient"))
             }
 
 
-        fun dns(): Dns {
+        fun dns(info: String?): Dns {
             return if (doh == null) {
-                println("[DNS Setting]Using SYSTEM DNS")
+                log.info("[DNS:${info}]Using SYSTEM DNS")
                 Dns.SYSTEM
             } else {
-                println("[DNS Setting]Using DoH DNS: ${doh!!.url}")
+                log.info("[DNS:${info}]Using DoH DNS: ${doh!!.url}")
                 doh!!
             }
         }
 
 
         fun setDoh(doh: Doh) {
-            println("[DNS Setting]Setting DoH: ${doh.name}, URL: ${doh.url}")
+            log.info("[DNS Setting]Setting DoH: ${doh.name}, URL: ${doh.url}")
             val dnsClient =
                 OkHttpClient().newBuilder().cache(Cache(Paths.doh(), 8000))
                     .callTimeout(Duration.of(5, ChronoUnit.SECONDS))
@@ -117,17 +117,18 @@ class Http {
                 DnsOverHttps.Builder().client(dnsClient).bootstrapDnsHosts(doh.hosts).url(doh.url.toHttpUrl()).build()
             client?.dispatcher?.executorService?.shutdownNow()
             client = builder.build()
-            println("[DNS Setting]DoH configured successfully")
+            log.info("[DNS Setting]DoH configured successfully")
         }
 
         fun resetDoh() {
-            println("[DNS Setting]Resetting DoH to system DNS")
-            Companion.doh = null
+            log.info("[DNS Setting]Resetting DoH to system DNS")
+            doh = null
             client?.dispatcher?.executorService?.shutdownNow()
             client = builder.build()
-            println("[DNS Setting]DoH reset to system DNS successfully")
+            log.info("[DNS Setting]DoH reset to system DNS successfully")
         }
 
+        @Suppress("unused")
         fun setProxy(proxy: String) {
             ProxySelect.setDefault(getSelector(proxy))
         }
@@ -157,14 +158,13 @@ class Http {
         }
 
         @JvmOverloads
-        fun Get(
+        fun get(
             url: String,
             params: Map<String, String?>? = null,
             headers: Headers? = null,
             connectTimeout: Long = 15, // 新增参数
             readTimeout: Long = 15     // 新增参数
         ): Call {
-            // 1. 构建URL和Request（保持原逻辑）
             val httpUrl = url.toHttpUrlOrNull()!!.newBuilder().apply {
                 params?.forEach { (name, value) ->
                     addQueryParameter(name, value)
@@ -177,7 +177,6 @@ class Http {
                 .apply { checkBaseAuth(httpUrl, this) }
                 .build()
 
-            // 仅在需要自定义超时时创建新Client
             return if (connectTimeout != 15L || readTimeout != 15L) {
                 client().newBuilder()
                     .connectTimeout(connectTimeout, TimeUnit.SECONDS)
@@ -185,11 +184,12 @@ class Http {
                     .build()
                     .newCall(request)
             } else {
-                client().newCall(request) // 默认使用原有Client
+                client().newCall(request)
             }
         }
 
-        fun Post(url: String, params: Map<String, String>?, headers: Headers?): Call {
+        @Suppress("unused")
+        fun post(url: String, params: Map<String, String>?, headers: Headers?): Call {
             val builder: HttpUrl.Builder = url.toHttpUrlOrNull()!!.newBuilder()
             val httpUrl: HttpUrl = builder.build()
             val request: Request.Builder = Request.Builder()

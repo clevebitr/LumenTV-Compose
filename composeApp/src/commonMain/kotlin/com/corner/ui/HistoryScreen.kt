@@ -130,6 +130,7 @@ fun HistoryItem(
 fun WindowScope.HistoryScene(vm: HistoryViewModel, onClickItem: (Vod) -> Unit, onClickBack: () -> Unit) {
     val model = vm.state.collectAsState()
     var chooseHistory by remember { mutableStateOf<History?>(null) }
+
     LaunchedEffect(Unit) {
         showProgress()
         SiteViewModel.viewModelScope.launch {
@@ -266,7 +267,6 @@ fun WindowScope.HistoryScene(vm: HistoryViewModel, onClickItem: (Vod) -> Unit, o
                         }) {
                         onClickItem(it.buildVod())
                         chooseHistory = it
-//                        showDetailDialog = true
                     }
                 }
             }

@@ -18,7 +18,6 @@ private var log = LoggerFactory.getLogger("Utils")
 
 object Utils {
 
-    // 可下载
     private val prefix = listOf("magnet")
 
     fun isDownloadLink(str: String): Boolean {
@@ -32,7 +31,7 @@ object Utils {
 
     fun substring(text: String?, num: Int): String? {
         return if (text != null && text.length > num) {
-            text.substring(0, text.length - num)
+            text.dropLast(num)
         } else {
             text
         }
@@ -47,7 +46,7 @@ object Utils {
             val stringBuilder = StringBuilder(bigInteger.toString(16))
             while (stringBuilder.length < 32) stringBuilder.insert(0, "0")
             return stringBuilder.toString().lowercase()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return ""
         }
 
@@ -60,6 +59,7 @@ object Utils {
      * @param cookie 多个cookie name=value;name2=value2
      * @return
      */
+    @Suppress("unused")
     fun webHeaders(referer: String, cookie: String): HashMap<String, String> {
         val map = webHeaders(referer)
         map[HttpHeaders.COOKIE] = cookie
@@ -70,17 +70,9 @@ object Utils {
         if (webHttpHeaderMap.isEmpty()) {
             if (webHttpHeaderMap.isEmpty()) {
                 webHttpHeaderMap = HashMap<String, String>()
-                //                    webHttpHeaderMap.put(HttpHeaders.CONTENT_TYPE, ContentType.Application.INSTANCE.getJson().getContentType());
-//                    webHttpHeaderMap.put(HttpHeaders.ACCEPT_LANGUAGE, "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2");
-                webHttpHeaderMap.put(
-                    org.apache.http.HttpHeaders.CONNECTION,
-                    "keep-alive"
-                )
-                webHttpHeaderMap.put(
-                    org.apache.http.HttpHeaders.USER_AGENT,
-                    Constants.ChromeUserAgent
-                )
-                webHttpHeaderMap.put(org.apache.http.HttpHeaders.ACCEPT, "*/*")
+                webHttpHeaderMap[org.apache.http.HttpHeaders.CONNECTION] = "keep-alive"
+                webHttpHeaderMap[org.apache.http.HttpHeaders.USER_AGENT] = Constants.ChromeUserAgent
+                webHttpHeaderMap[org.apache.http.HttpHeaders.ACCEPT] = "*/*"
             }
         }
         if (StringUtils.isNotBlank(referer)) {
@@ -108,7 +100,7 @@ object Utils {
             val sb = java.lang.StringBuilder()
             for (b in digest.digest()) sb.append(((b.toInt() and 0xff) + 0x100).toString(16).substring(1))
             return sb.toString()
-        } catch (e: java.lang.Exception) {
+        } catch (_: java.lang.Exception) {
             return ""
         }
     }
@@ -128,7 +120,7 @@ object Utils {
             if (text.startsWith("上") || text.startsWith("下")) return -1
             return text.replace("(?i)(mp4|H264|H265|720p|1080p|2160p|4K)".toRegex(), "").replace("\\D+".toRegex(), "")
                 .toInt()
-        } catch (e: java.lang.Exception) {
+        } catch (_: java.lang.Exception) {
             return -1
         }
     }

@@ -179,7 +179,7 @@ object OkHttp {
         get() = OkHttpClient.Builder()
             .proxy(getProxy())
             .addInterceptor(OkhttpInterceptor())
-            .addInterceptor(M3U8AdFilterInterceptor.Interceptor()) // 添加拦截器
+            .addInterceptor(M3U8AdFilterInterceptor.Interceptor())
             .dns(dns())
             .connectTimeout(2, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)

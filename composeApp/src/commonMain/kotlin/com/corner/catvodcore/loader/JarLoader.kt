@@ -54,23 +54,26 @@ object JarLoader {
             try {
                 if (StringUtils.isBlank(currentSpider)) return
 
-                val texts = currentSpider.split(Constant.md5Split)
+                val texts = currentSpider.split(Constant.MD5_SPLIT)
                 val md5 = if (texts.size <= 1) "" else texts[1].trim()
                 val jar = texts[0]
                 log.debug("<loadJar>md5 is {}", md5)
                 log.debug("<loadJar>texts is {}", texts)
                 when {
                     md5.isNotEmpty() && Utils.equals(parseJarUrl(jar), md5) -> {
+                        log.info("md5校验成功，以md5方式加载...")
                         load(key, Paths.jar(parseJarUrl(jar)))
                         return
                     }
 
                     jar.startsWith("file") -> {
+                        log.info("jar文件已存在，以文件方式加载...")
                         load(key, Paths.local(jar))
                         return
                     }
 
                     jar.startsWith("http") -> {
+                        log.info("jar文件不存在，以http方式加载...")
                         load(key, download(jar))
                         return
                     }
@@ -172,7 +175,7 @@ object JarLoader {
         val jarPath = Paths.jar(jar)
         log.debug("download jar file {} to:{}", jar, jarPath)
 
-        return Http.Get(jar).execute().use { response ->
+        return Http.get(jar).execute().use { response ->
             val body = response.body
             Paths.write(jarPath, body.bytes())
         }

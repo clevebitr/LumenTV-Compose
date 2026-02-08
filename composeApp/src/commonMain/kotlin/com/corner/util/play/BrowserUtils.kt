@@ -86,8 +86,6 @@ object BrowserUtils {
 
     /**
      * 处理切换到下一集的逻辑。
-     *
-     * @param vm 详情页的 ViewModel 实例，用于获取下一集的相关信息。
      */
     fun handleNextEpisode() {
         if (isSwitching.compareAndSet(false, true)) {

@@ -36,6 +36,7 @@ import com.corner.ui.nav.data.ViewModelState
 import com.corner.ui.scene.SnackBar
 import com.corner.util.Constants
 import com.corner.util.m3u8.M3U8AdFilterInterceptor
+import com.corner.util.m3u8.M3U8Cache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import okhttp3.OkHttpClient
@@ -230,6 +231,9 @@ object SiteViewModel {
             this.playUrl = site.playUrl
             // 其他类型特有：设置解析标识（0=无需解析，1=需要解析）
             this.parse = if (StringUtils.isBlank(site.playUrl)) 0 else 1
+            if (StringUtils.isNotBlank(flag)) {
+                this.flag = flag
+            }
         }
     }
 
@@ -457,7 +461,7 @@ object SiteViewModel {
      * @param keyword 搜索的关键词
      * @param page 搜索的页码
      */
-    @Suppress("UNUSED_FUNCTION")
+    @Suppress("unused")
     fun searchContent(site: Site, keyword: String, page: String) {
         try {
             // 检查站点类型是否为 3

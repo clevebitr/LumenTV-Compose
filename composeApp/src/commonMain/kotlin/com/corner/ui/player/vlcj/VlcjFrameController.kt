@@ -233,7 +233,7 @@ class VlcjFrameController(
         }
     }
 
-
+    @Suppress("unused")
     fun isPlaying(): Boolean {
         return !isReleased && controller.player?.status()?.isPlayable == true && controller.player?.status()?.isPlaying == true
     }
@@ -269,6 +269,7 @@ class VlcjFrameController(
         }
     }
 
+    @Suppress("unused")
     fun getPlayer(): MediaPlayer? {
         return controller.player
     }

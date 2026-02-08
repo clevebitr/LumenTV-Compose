@@ -1,6 +1,6 @@
 package com.corner
 
-import AppTheme
+import com.corner.ui.theme.AppTheme
 import com.corner.ui.scene.SnackBar.SnackBarList
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

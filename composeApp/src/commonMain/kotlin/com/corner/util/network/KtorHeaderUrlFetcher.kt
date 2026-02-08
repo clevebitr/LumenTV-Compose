@@ -29,35 +29,45 @@ class KtorHeaderUrlFetcher private constructor(
 
     @OptIn(ExperimentalResourceApi::class)
     override suspend fun fetch(): FetchResult {
-            var url = httpUrl.toString()
-            val response = httpClient.request {
-                headers {
-                    if (url.contains("@Headers=")) {
-                        appendAll(StringValues.build {
-                            val elements = Jsons.parseToJsonElement(url.split("@Headers=").apply { url = this[0] }[1].split("@")[0])
-                            for (jsonElement in elements.jsonObject) {
-                                append(jsonElement.key, jsonElement.value.toString())
-                            }
-                        })
-                    }
-                    if (url.contains("@Cookie=")) append(HttpHeaders.Cookie, url.split("@Cookie=").apply { url = this[0] }[1].split("@")[0])
-                    if (url.contains("@Referer=")) append(HttpHeaders.Referrer, url.split("@Referer=").apply { url = this[0] }[1].split("@")[0])
-                    if (url.contains("@User-Agent=")) append(HttpHeaders.UserAgent, url.split("@User-Agent=").apply { url = this[0] }[1].split("@")[0])
-
+        var url = httpUrl
+        val response = httpClient.request {
+            headers {
+                if (url.contains("@Headers=")) {
+                    appendAll(StringValues.build {
+                        val elements =
+                            Jsons.parseToJsonElement(url.split("@Headers=").apply { url = this[0] }[1].split("@")[0])
+                        for (jsonElement in elements.jsonObject) {
+                            append(jsonElement.key, jsonElement.value.toString())
+                        }
+                    })
                 }
-                url(url)
-            }
-            if (response.status.isSuccess()) {
-                val ofSource = FetchResult.OfPainter(
-                    painter = BitmapPainter(
-                        withContext(Dispatchers.IO) {
-                            response.bodyAsChannel().toInputStream().readAllBytes()
-                        }.decodeToImageBitmap()
-                    )
+                if (url.contains("@Cookie=")) append(
+                    HttpHeaders.Cookie,
+                    url.split("@Cookie=").apply { url = this[0] }[1].split("@")[0]
                 )
-                return ofSource
+                if (url.contains("@Referer=")) append(
+                    HttpHeaders.Referrer,
+                    url.split("@Referer=").apply { url = this[0] }[1].split("@")[0]
+                )
+                if (url.contains("@User-Agent=")) append(
+                    HttpHeaders.UserAgent,
+                    url.split("@User-Agent=").apply { url = this[0] }[1].split("@")[0]
+                )
+
             }
-            throw RuntimeException("code:${response.status.value}, ${response.status.description}")
+            url(url)
+        }
+        if (response.status.isSuccess()) {
+            val ofSource = FetchResult.OfPainter(
+                painter = BitmapPainter(
+                    withContext(Dispatchers.IO) {
+                        response.bodyAsChannel().toInputStream().readAllBytes()
+                    }.decodeToImageBitmap()
+                )
+            )
+            return ofSource
+        }
+        throw RuntimeException("code:${response.status.value}, ${response.status.description}")
     }
 
 
@@ -73,8 +83,8 @@ class KtorHeaderUrlFetcher private constructor(
     companion object {
 
         val CustomUrlFetcher = Factory {
-            KtorClient.createHttpClient(){
-                engine{
+            KtorClient.createHttpClient {
+                engine {
                     config {
                         callTimeout(Duration.parse("2s"))
                         readTimeout(Duration.parse("2s"))

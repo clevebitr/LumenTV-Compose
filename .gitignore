@@ -18,4 +18,5 @@ cache
 **/*.log
 
 /desktopApp/data/
+.fleet
 #/composeApp/src/desktopMain/resources/res

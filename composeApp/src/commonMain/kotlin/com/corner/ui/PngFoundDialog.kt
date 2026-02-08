@@ -33,7 +33,7 @@ private val pngLog = LoggerFactory.getLogger("PngFoundDialog")
 @Composable
 fun PngFoundDialog(
     m3u8Url: String,
-    Text: String,
+    text: String,
     onDismiss: () -> Unit,
     onOpenInBrowser: () -> Unit,
     vm: DetailViewModel
@@ -59,7 +59,7 @@ fun PngFoundDialog(
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     Text(
-                        text = Text,
+                        text = text,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 18.sp,
                             lineHeight = 24.sp,

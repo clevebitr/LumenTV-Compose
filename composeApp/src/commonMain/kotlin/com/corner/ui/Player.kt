@@ -97,7 +97,7 @@ fun Player(
         val volume = SettingStore.getCache("playerState")
         if (volume != null) {
             val v = (volume as PlayerStateCache).get("volume")?.toFloat()
-            controller.doWithPlayState { it.update { it.copy(volume = v ?: .8f) } }
+            controller.doWithPlayState { it -> it.update { it.copy(volume = v ?: .8f) } }
         }
     }
 
@@ -117,7 +117,6 @@ fun Player(
 
                         // 只在x方向微动，y方向保持不变
                         robot.mouseMove(currentMousePos.x + v, currentMousePos.y)
-//                        player_log.debug("robot moveMouse: ${currentMousePos.x + v}, ${currentMousePos.y}")
                         time++
                     }, 0, 6000L)
                 }
@@ -136,7 +135,7 @@ fun Player(
     DisposableEffect(mrl) {
         scope.launch {
             if (StringUtils.isNotBlank(mrl)) {
-                player_log.debug("userTriggered : {},自动加载 mrl: {}", userTriggered,!userTriggered)
+                player_log.debug("userTriggered : {},自动加载 mrl: {}", userTriggered, !userTriggered)
                 if (!userTriggered) {
                     controller.load(mrl)
                 }
@@ -180,6 +179,7 @@ fun Player(
                         }
                         true
                     }
+
                     KeyEventType.KeyUp -> {
                         isRightArrowPressed = false
                         longPressJob?.cancel()
@@ -193,6 +193,7 @@ fun Player(
                         }
                         true
                     }
+
                     else -> false
                 }
             }
@@ -214,6 +215,7 @@ fun Player(
                 controller.toggleFullscreen()
                 true
             }
+
             else -> false
         }
     }
@@ -330,9 +332,9 @@ fun MediaInfoDialog(modifier: Modifier, playerState: PlayerState, show: Boolean,
     Dialog(modifier, showDialog = show, onClose = onClose) {
         val scrollbar = rememberLazyListState(0)
         val formattedTime = Utils.formatMilliseconds(mediaInfo.value?.duration ?: 0)
-        val bitRate = if(mediaInfo.value?.bitRate == 0){
+        val bitRate = if (mediaInfo.value?.bitRate == 0) {
             "未知"
-        }else{
+        } else {
             mediaInfo.value?.bitRate
         }
         Box {
@@ -350,7 +352,7 @@ fun MediaInfoDialog(modifier: Modifier, playerState: PlayerState, show: Boolean,
                     )
 
                     Text("分辨率：${mediaInfo.value?.width ?: ""} * ${mediaInfo.value?.height ?: ""}")
-                    Text("视频编码格式：${ mediaInfo.value?.videoCodec ?: ""}")
+                    Text("视频编码格式：${mediaInfo.value?.videoCodec ?: ""}")
                     Text("编解码器说明：${mediaInfo.value?.codecDescription ?: ""}")
                     Text("比特率：${bitRate}")
                     Text("时长：${formattedTime}")

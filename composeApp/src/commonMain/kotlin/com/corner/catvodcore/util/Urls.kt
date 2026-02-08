@@ -13,7 +13,9 @@ object Urls {
 
     fun convert(baseUrl:String, refUrl:String):String{
         try {
-            return URI(baseUrl.replace("file://", "file:/").replace("\\", "/")).resolve(refUrl).toString()
+            val url = URI(baseUrl.replace("file://", "file:/").replace("\\", "/")).resolve(refUrl).toString()
+            log.info("解析url：$url，baseUrl $baseUrl，refUrl $refUrl")
+            return url
         } catch (e: Exception) {
             log.error("解析url失败 返回空值", e)
             return ""

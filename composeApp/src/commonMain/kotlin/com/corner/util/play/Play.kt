@@ -95,6 +95,7 @@ fun getProcessBuilder(url:String, title: String?): ProcessBuilder? {
 
 
 //default player [mpc-hc]
+@Suppress("unused")
 fun getDefaultPlayerPath():String {
     val resourcesDir = File(System.getProperty("compose.application.resources.dir"))
     // 已经解压

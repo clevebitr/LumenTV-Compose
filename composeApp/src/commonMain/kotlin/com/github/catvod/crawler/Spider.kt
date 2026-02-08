@@ -62,10 +62,10 @@ open class Spider{
 
     companion object {
         @JvmField
-        val dns: Dns = Http.dns()
+        val dns: Dns = Http.dns("Spider")
         @JvmStatic
         fun safeDns(): Dns {
-            return Http.dns()
+            return Http.dns("Spider")
         }
     }
 
@@ -74,5 +74,5 @@ open class Spider{
     }
 
     val dns: Dns
-        get() = Http.dns()
+        get() = Http.dns("Spider")
 }

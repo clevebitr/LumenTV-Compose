@@ -2,12 +2,10 @@ package com.corner.ui.nav.vm
 
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.database.Db
-import com.corner.database.entity.History
 import com.corner.ui.nav.BaseViewModel
 import com.corner.ui.nav.data.HistoryScreenState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 

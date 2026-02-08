@@ -18,6 +18,7 @@ import org.jetbrains.compose.resources.painterResource
 import lumentv_compose.composeapp.generated.resources.Res
 import lumentv_compose.composeapp.generated.resources.loading
 
+@Suppress("unused")
 @Composable
 fun HorizontalItem(modifier: Modifier, vod:Vod, onClick:(Vod)->Unit){
     Box(modifier.padding(8.dp)

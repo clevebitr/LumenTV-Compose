@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
@@ -105,6 +106,8 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
     val isAdFilterEnabled by remember { mutableStateOf(SettingStore.isAdFilterEnabled()) }
     var adFilterChecked by remember { mutableStateOf(isAdFilterEnabled) }
     var showRestartDialog by remember { mutableStateOf(false) }
+    val updateCheckState by vm.updateCheckState.collectAsState()
+
     DisposableEffect("setting") {
         vm.sync()
         onDispose {
@@ -147,6 +150,37 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                         }
                     },
                     actions = {
+                        FilledTonalButton(
+                            onClick = {
+                                Desktop.getDesktop().open(Paths.logPath())
+                            },
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = ButtonDefaults.filledTonalButtonElevation(
+                                defaultElevation = 2.dp,
+                                pressedElevation = 4.dp
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Code, // 或其他合适的图标
+                                    contentDescription = "日志目录",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    "日志目录",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                         // 数据目录按钮
                         FilledTonalButton(
                             onClick = { Desktop.getDesktop().open(Paths.userDataRoot()) },
@@ -741,6 +775,85 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                 }
             }
 
+            item {
+                SettingCard(
+                    title = "更新检查",
+                    icon = Icons.Default.SystemUpdate
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { vm.checkForUpdate() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !updateCheckState.isChecking,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            if (updateCheckState.isChecking) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text("检查中...")
+                                }
+                            } else {
+                                Text("手动检查更新")
+                            }
+                        }
+
+                        // 显示检查结果
+                        if (updateCheckState.hasUpdate && updateCheckState.latestVersion != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "发现新版本: ${updateCheckState.latestVersion}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Button(
+                                    onClick = {
+                                        // 触发更新流程或显示更新对话框
+                                        SnackBar.postMsg(
+                                            "发现新版本 ${updateCheckState.latestVersion}，请重启应用进行更新",
+                                            type = SnackBar.MessageType.INFO
+                                        )
+
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Text("立即更新")
+                                }
+                            }
+                        }
+
+                        if (updateCheckState.error != null) {
+                            Text(
+                                text = "检查失败: ${updateCheckState.error}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
 
             // 代理设置项
             item {
@@ -751,7 +864,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                     val proxySetting = derivedStateOf {
                         model.value.settingList.getSetting(SettingType.PROXY)
                             ?.value?.parseAsSettingEnable()
-                            ?: SettingEnable.Default()
+                            ?: SettingEnable.default()
                     }
 
                     Row(
@@ -1059,6 +1172,7 @@ private val logLevel = listOf("INFO", "DEBUG")
 enum class SideButtonType {
     LEFT, MID, RIGHT
 }
+
 @Suppress("unused")
 @Composable
 fun SideButton(
@@ -1196,7 +1310,7 @@ fun AboutDialog(
                         )
 
                         Text(
-                            text = "1.1.0",
+                            text = "1.1.1",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )

@@ -8,7 +8,7 @@ class ProxySelect : ProxySelector() {
 
     private var proxy: Proxy? = null
 
-    private var proxyHosts: List<String>? = null;
+    private var proxyHosts: List<String>? = null
 
     companion object {
         fun setDefault(proxySelector: ProxySelector) {
@@ -29,7 +29,7 @@ class ProxySelect : ProxySelector() {
     }
 
     fun setProxyHosts(hosts: List<String>) {
-        proxyHosts = hosts;
+        proxyHosts = hosts
     }
 
     fun setProxy(proxy: String) {
