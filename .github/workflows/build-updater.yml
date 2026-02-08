@@ -72,7 +72,7 @@ jobs:
           cache: true
 
       - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
-        working-directory: ./Updater
+        working-directory: ./updater
         shell: bash
         run: |
           go mod tidy
@@ -90,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: updater-binary-${{ matrix.os }}-${{ matrix.goarch }}
-          path: ./Updater/${{ matrix.binary_name }}
+          path: ./updater/${{ matrix.binary_name }}
           retention-days: 0  # 永久保存
 
   create-release:
