@@ -71,7 +71,7 @@ jobs:
           go build -o updater main.go
           cd ..
       - name: copy updater to app
-        run: cp ./Updater/updater ./composeApp/build/compose/binaries/main-release/app/LumenTV/updater
+        run: cp ./updater/updater ./composeApp/build/compose/binaries/main-release/app/LumenTV/updater
       - name: compress
         run: cd ./composeApp/build/compose/binaries/main-release/app && zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./LumenTV
       - name: move file
@@ -83,7 +83,6 @@ jobs:
           path: |
             *.deb
             *.zip
-            #https://github.com/JetBrains/compose-multiplatform/blob/master/tutorials/Signing_and_notarization_on_macOS/README.md
   build-mac:
     needs: set-tag
     runs-on: macos-15
