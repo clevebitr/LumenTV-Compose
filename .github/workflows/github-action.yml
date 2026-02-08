@@ -29,7 +29,7 @@ jobs:
       - name: build updater
         shell: pwsh
         run: |
-          cd Updater
+          cd updater
           go build -o updater.exe main.go
           cd ..
       - name: copy updater to app
@@ -67,7 +67,7 @@ jobs:
       - run: ls && tree
       - name: build updater
         run: |
-          cd Updater
+          cd updater
           go build -o updater main.go
           cd ..
       - name: copy updater to app
@@ -83,7 +83,7 @@ jobs:
           path: |
             *.deb
             *.zip
-            #            https://github.com/JetBrains/compose-multiplatform/blob/master/tutorials/Signing_and_notarization_on_macOS/README.md
+            #https://github.com/JetBrains/compose-multiplatform/blob/master/tutorials/Signing_and_notarization_on_macOS/README.md
   build-mac:
     needs: set-tag
     runs-on: macos-15
@@ -95,51 +95,41 @@ jobs:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-
       - run: ls
-
-      # Step 1: Build the .app bundle
       - run: chmod +x ./gradlew && ./gradlew packageReleaseDistributionForCurrentOS
-
-      # Step 2: Build updater binary
       - name: build updater
         run: |
-          cd Updater
+          cd updater
           go build -o updater main.go
           cd ..
 
-      # Step 3: Locate and inject updater into .app BEFORE creating DMG
       - name: inject updater into .app bundle
         run: |
           # Common path for Compose Multiplatform macOS app bundle
           APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
-  
+          
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: Expected .app at $APP_PATH not found!"
             echo "Searching for LumenTV.app in composeApp/build..."
             find ./composeApp/build -name "LumenTV.app" -type d
             exit 1
           fi
-  
+          
           echo "Injecting updater into $APP_PATH/Contents/Resources/"
           mkdir -p "$APP_PATH/Contents/Resources/"
           cp ./Updater/updater "$APP_PATH/Contents/Resources/updater"
           chmod +x "$APP_PATH/Contents/Resources/updater"
 
-      # Step 4: Now create DMG (which will include the modified .app)
       - run: ./gradlew createReleaseDistributable
 
-      # Step 5: Create ZIP of the .app (optional, for direct run without installer)
       - name: compress .app as zip
         run: |
           APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
           zip -q -r "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$APP_PATH"
 
-      # Step 6: Move DMG to root for upload
       - name: move dmg file
         run: mv ./composeApp/build/compose/binaries/main-release/dmg/*.dmg "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
 
