@@ -201,7 +201,7 @@ fun WindowScope.VideoScene(
                 VideoTopBar(
                     vm = vm,
                     onClickSearch = { onClickSwitch(Menu.SEARCH) },
-                    onClickChooseHome = { !showChooseHome },
+                    onClickChooseHome = { showChooseHome = !showChooseHome },
                     onClickSetting = { onClickSwitch(Menu.SETTING) },
                     onClickHistory = { onClickSwitch(Menu.HISTORY) })
             }
