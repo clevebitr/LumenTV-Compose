@@ -48,6 +48,7 @@ jobs:
 
       - name: 🔧 Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
         working-directory: ./updater
+        shell: bash
         run: |
           echo "🚀 开始构建 updater: ${{ matrix.binary_name }}"
           echo "🖥️  目标平台: ${{ matrix.goos }}/${{ matrix.goarch }}"
