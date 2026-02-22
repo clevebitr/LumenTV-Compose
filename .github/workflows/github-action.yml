@@ -101,12 +101,15 @@ jobs:
         shell: pwsh
         run: |
           # 移动 MSI 文件到根目录
-          $msiFiles = Get-ChildItem -Path "./composeApp/build/compose/binaries/main-release/msi" -Filter "*.msi" -ErrorAction SilentlyContinue
-          if ($msiFiles) {
-            $msiFiles | ForEach-Object {
-              Move-Item $_.FullName "./$($_.Name)" -Force
-              Write-Host "✅ MSI 文件已移动: $($_.Name)"
+          $msiPath = "./composeApp/build/compose/binaries/main-release/msi"
+          if (Test-Path $msiPath) {
+            Get-ChildItem -Path $msiPath -Filter "*.msi" | ForEach-Object {
+              $newName = "LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi"
+              Move-Item $_.FullName "./$newName" -Force
+              Write-Host "✅ MSI 文件已移动并重命名: $newName"
             }
+          } else {
+            Write-Host "⚠️  MSI 目录不存在: $msiPath"
           }
           
           # 创建并移动 ZIP 文件
@@ -152,7 +155,13 @@ jobs:
       - name: 📦 Package Linux application
         run: |
           # 移动 DEB 文件到根目录
-          find ./composeApp/build/compose/binaries/main-release/deb -name "*.deb" -exec mv {} ./ \; 2>/dev/null || true
+          DEB_DIR="./composeApp/build/compose/binaries/main-release/deb"
+          if [ -d "$DEB_DIR" ]; then
+            find "$DEB_DIR" -name "*.deb" -exec sh -c 'mv "$1" "./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb"' _ {} \;
+            echo "✅ DEB 文件已移动并重命名"
+          else
+            echo "⚠️ DEB 目录不存在: $DEB_DIR"
+          fi
           
           # 创建并移动 ZIP 文件
           APP_DIR="./composeApp/build/compose/binaries/main-release/app/LumenTV"
@@ -201,7 +210,13 @@ jobs:
       - name: 📦 Package macOS application
         run: |
           # 移动 DMG 文件到根目录
-          find ./composeApp/build/compose/binaries/main-release/dmg -name "*.dmg" -exec mv {} ./ \; 2>/dev/null || true
+          DMG_DIR="./composeApp/build/compose/binaries/main-release/dmg"
+          if [ -d "$DMG_DIR" ]; then
+            find "$DMG_DIR" -name "*.dmg" -exec sh -c 'mv "$1" "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"' _ {} \;
+            echo "✅ DMG 文件已移动并重命名"
+          else
+            echo "⚠️ DMG 目录不存在: $DMG_DIR"
+          fi
           
           # 创建并移动 ZIP 文件
           APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
