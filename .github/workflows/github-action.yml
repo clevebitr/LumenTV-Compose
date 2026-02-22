@@ -94,8 +94,8 @@ jobs:
       - name: 🏗️ Build LumenTV Windows
         run: |
           echo "🔨 开始构建 LumenTV Windows 版本"
-          ./gradlew packageReleaseDistributionForCurrentOS
-          ./gradlew createReleaseDistributable
+          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
+          ./gradlew createReleaseDistributable --quiet --console=plain -Porg.gradle.warning.mode=none
 
       - name: 📦 Package Windows application
         shell: pwsh
@@ -149,8 +149,8 @@ jobs:
         run: |
           chmod +x ./gradlew
           echo "🔨 开始构建 LumenTV Linux 版本"
-          ./gradlew packageReleaseDistributionForCurrentOS
-          ./gradlew createReleaseDistributable
+            ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
+            ./gradlew createReleaseDistributable --quiet --console=plain -Porg.gradle.warning.mode=none
 
       - name: 📦 Package Linux application
         run: |
@@ -176,7 +176,7 @@ jobs:
             pwd
             echo "APP_DIR 变量值: $APP_DIR"
           
-            zip -j -q "./$ZIP_NAME" "$APP_DIR"/*
+            zip -r -q "./$ZIP_NAME" "$APP_DIR"
             echo "✅ Linux ZIP 包已创建: $ZIP_NAME"
             # 验证文件是否存在
             if [ -f "$ZIP_NAME" ]; then
@@ -216,7 +216,7 @@ jobs:
         run: |
           chmod +x ./gradlew
           echo "🔨 开始构建 LumenTV macOS 版本"
-          ./gradlew packageReleaseDistributionForCurrentOS
+          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
 
       - name: 🏗️ Create distributable
         run: ./gradlew createReleaseDistributable
