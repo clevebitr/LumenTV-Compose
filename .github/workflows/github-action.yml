@@ -1,155 +1,234 @@
 name: LumenTV Compose Build
 on:
   workflow_dispatch:
-#  push:
-#    tags:
-#      - v*.*.*
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
 
 jobs:
   set-tag:
     uses: ./.github/workflows/set-tag-workflow.yml
+
+  build-updater:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary_name: updater-linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary_name: updater-linux-arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            binary_name: updater-windows-amd64.exe
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary_name: updater-macos-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary_name: updater-macos-arm64
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: 🔧 Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
+        working-directory: ./updater
+        shell: bash
+        run: |
+          echo "🚀 开始构建 updater: ${{ matrix.binary_name }}"
+          echo "🖥️  目标平台: ${{ matrix.goos }}/${{ matrix.goarch }}"
+          
+          go mod tidy
+          echo "📦 Go modules 已同步"
+          
+          BUILD_CMD="GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -ldflags=\"-s -w\" -o ../${{ matrix.binary_name }} ."
+          echo "🔨 执行构建命令: $BUILD_CMD"
+          
+          eval $BUILD_CMD
+          
+          if [ -f "../${{ matrix.binary_name }}" ]; then
+            echo "✅ Updater 构建成功: ${{ matrix.binary_name }}"
+            ls -la "../${{ matrix.binary_name }}"
+            echo "📏 文件大小: $(du -h "../${{ matrix.binary_name }}" | cut -f1)"
+          else
+            echo "❌ Updater 构建失败: ${{ matrix.binary_name }} 未找到"
+            exit 1
+          fi
+
+      - name: 📤 Upload updater artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary_name }}
+          path: ./${{ matrix.binary_name }}
+          retention-days: 1
+
   build-win:
     runs-on: windows-latest
-    needs: set-tag
+    needs: [set-tag, build-updater]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      - run: echo ${{needs.set-tag.outputs.tag}}
-      - run: ls
-      - run: ./gradlew packageReleaseDistributionForCurrentOS
-      - run: ./gradlew createReleaseDistributable
-      - run: ls && tree ./desktopApp /f
-      - name: build updater
+
+      - name: 🏗️ Build LumenTV Windows
+        run: |
+          echo "🔨 开始构建 LumenTV Windows 版本"
+          ./gradlew packageReleaseDistributionForCurrentOS
+          ./gradlew createReleaseDistributable
+
+      - name: 📦 Package Windows application
         shell: pwsh
         run: |
-          cd updater
-          go build -o updater.exe main.go
-          cd ..
-      - name: copy updater to app
-        shell: pwsh
-        run: Copy-Item -Path "./Updater/updater.exe" -Destination "./composeApp/build/compose/binaries/main-release/app/LumenTV/updater.exe"
-      - name: compress
-        shell: pwsh
-        run: Compress-Archive -Path "./composeApp/build/compose/binaries/main-release/app/LumenTV" -DestinationPath ./LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip
-      - name: move result to root
-        shell: pwsh
-        run: Move-Item -Path "./composeApp/build/compose/binaries/main-release/app/*.zip" -Destination "./" && Move-Item -Path "./composeApp/build/compose/binaries/main-release/msi/*.msi" -Destination "./"
-      - run: ls
-      - uses: actions/upload-artifact@v4
+          $appPath = "./composeApp/build/compose/binaries/main-release/app/LumenTV"
+          if (Test-Path $appPath) {
+            Compress-Archive -Path "$appPath" -DestinationPath "./LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip"
+            echo "✅ Windows 应用包已创建"
+          } else {
+            echo "❌ 应用目录不存在: $appPath"
+            exit 1
+          }
+
+      - name: 📤 Upload Windows artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: win-file
           path: |
             *.msi
             *.zip
+
   build-linux:
     runs-on: ubuntu-latest
-    needs: set-tag
+    needs: [set-tag, build-updater]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      - run: ls
-      - run: chmod +x ./gradlew && ./gradlew packageReleaseDistributionForCurrentOS
-      - run: ./gradlew createReleaseDistributable
-      - run: ls && tree
-      - name: build updater
+
+      - name: 🏗️ Build LumenTV Linux
         run: |
-          cd updater
-          go build -o updater main.go
-          cd ..
-      - name: copy updater to app
-        run: cp ./updater/updater ./composeApp/build/compose/binaries/main-release/app/LumenTV/updater
-      - name: compress
-        run: cd ./composeApp/build/compose/binaries/main-release/app && zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./LumenTV
-      - name: move file
-        run: mv ./composeApp/build/compose/binaries/main-release/deb/*.deb ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb && mv ./composeApp/build/compose/binaries/main-release/app/*.zip ./
-      - run: ls
-      - uses: actions/upload-artifact@v4
+          chmod +x ./gradlew
+          echo "🔨 开始构建 LumenTV Linux 版本"
+          ./gradlew packageReleaseDistributionForCurrentOS
+          ./gradlew createReleaseDistributable
+
+      - name: 📦 Package Linux application
+        run: |
+          APP_DIR="./composeApp/build/compose/binaries/main-release/app/LumenTV"
+          if [ -d "$APP_DIR" ]; then
+            cd ./composeApp/build/compose/binaries/main-release/app
+            zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./LumenTV
+            echo "✅ Linux 应用包已创建"
+          else
+            echo "❌ 应用目录不存在: $APP_DIR"
+            exit 1
+          fi
+
+      - name: 📤 Upload Linux artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: linux-file
           path: |
             *.deb
             *.zip
-  build-mac:
-    needs: set-tag
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+  build-mac:
+    runs-on: macos-latest
+    needs: [set-tag, build-updater]
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      - run: ls
-      - run: chmod +x ./gradlew && ./gradlew packageReleaseDistributionForCurrentOS
-      - name: build updater
-        run: |
-          cd updater
-          go build -o updater main.go
-          cd ..
 
-      - name: inject updater into .app bundle
+      - name: 🏗️ Build LumenTV macOS
         run: |
-          # Common path for Compose Multiplatform macOS app bundle
+          chmod +x ./gradlew
+          echo "🔨 开始构建 LumenTV macOS 版本"
+          ./gradlew packageReleaseDistributionForCurrentOS
+
+      - name: 🏗️ Create distributable
+        run: ./gradlew createReleaseDistributable
+
+      - name: 📦 Package macOS application
+        run: |
           APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
-          
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERROR: Expected .app at $APP_PATH not found!"
-            echo "Searching for LumenTV.app in composeApp/build..."
-            find ./composeApp/build -name "LumenTV.app" -type d
+          if [ -d "$APP_PATH" ]; then
+            zip -q -r "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$APP_PATH"
+            echo "✅ macOS 应用包已创建"
+          else
+            echo "❌ 应用目录不存在: $APP_PATH"
             exit 1
           fi
-          
-          echo "Injecting updater into $APP_PATH/Contents/Resources/"
-          mkdir -p "$APP_PATH/Contents/Resources/"
-          cp ./Updater/updater "$APP_PATH/Contents/Resources/updater"
-          chmod +x "$APP_PATH/Contents/Resources/updater"
 
-      - run: ./gradlew createReleaseDistributable
-
-      - name: compress .app as zip
-        run: |
-          APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
-          zip -q -r "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$APP_PATH"
-
-      - name: move dmg file
-        run: mv ./composeApp/build/compose/binaries/main-release/dmg/*.dmg "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
-
-      - run: ls -la
-
-      - uses: actions/upload-artifact@v4
+      - name: 📤 Upload macOS artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: mac-file
           path: |
             *.dmg
             *.zip
+
   release:
     runs-on: ubuntu-latest
-    needs: [ build-win, build-linux, build-mac, set-tag ]
+    needs: [ build-win, build-linux, build-mac, set-tag, build-updater ]
     steps:
-      - name: Download all workflow run artifacts
+      - name: 📥 Download all artifacts
         uses: actions/download-artifact@v4
-      - run: ls && tree
-      - name: generate version.json
+
+      - name: 📋 Organize files for release
         run: |
-          cat > version.json << EOF
+          echo "📂 整理发布文件"
+          mkdir -p ./release-files
+          
+          # 复制应用程序包
+          find . -name "*.zip" -o -name "*.deb" -o -name "*.msi" -o -name "*.dmg" -exec cp {} ./release-files/ \;
+          
+          # 复制 updater 文件
+          find . -path "*/updater-linux-amd64/updater-linux-amd64" -exec cp {} ./release-files/ \;
+          find . -path "*/updater-linux-arm64/updater-linux-arm64" -exec cp {} ./release-files/ \;
+          find . -path "*/updater-windows-amd64.exe/updater-windows-amd64.exe" -exec cp {} ./release-files/ \;
+          find . -path "*/updater-macos-amd64/updater-macos-amd64" -exec cp {} ./release-files/ \;
+          find . -path "*/updater-macos-arm64/updater-macos-arm64" -exec cp {} ./release-files/ \;
+
+          echo "📋 发布文件列表:"
+          ls -la ./release-files/
+
+      - name: 📝 Generate version.json
+        run: |
+          echo "📝 生成版本信息文件"
+          cat > ./release-files/version.json << EOF
           {
             "version": "${{ needs.set-tag.outputs.tag }}",
             "windows": {
@@ -166,16 +245,33 @@ jobs:
             }
           }
           EOF
-      - name: Release
+
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            **/*.zip
-            **/*.deb
-            **/*.pkg
-            **/*.dmg
-            **/*.msi
-            version.json
+          files: ./release-files/*
           tag_name: ${{ needs.set-tag.outputs.tag }}
+          name: "LumenTV ${{ needs.set-tag.outputs.tag }}"
+          body: |
+            ## LumenTV ${{ needs.set-tag.outputs.tag }} 发布
+            
+            ### 🔄 更新内容
+            - 发布独立的 updater 组件
+            - 优化自动更新流程
+            - 修复已知问题
+            
+            ### 📦 包含文件
+            - Windows: MSI 安装包和 ZIP 压缩包
+            - Linux: DEB 包和 ZIP 压缩包  
+            - macOS: DMG 镜像和 ZIP 压缩包
+            - Updater: 各平台独立的更新器组件
+            - version.json: 版本信息文件
+            
+            ### 🛠️ 技术说明
+            - updater 组件独立发布，便于自动更新系统使用
+            - 应用程序包不包含 updater，减小包体积
+            - 支持按需下载对应平台的 updater
+          draft: false
+          prerelease: false
     permissions:
       contents: write

@@ -39,6 +39,8 @@ import com.corner.ui.navigation.SearchScreen
 import com.corner.ui.scene.ControlBar
 import com.corner.ui.scene.RatioBtn
 import com.corner.ui.video.VideoItem
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class SearchPageType {
     PAGE
@@ -58,6 +60,8 @@ fun WindowScope.SearchScene(
     onClickBack: () -> Unit
 ) {
     var currentPage by remember { mutableStateOf(SearchScreen.Search) }
+    var isClicking by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // 处理返回逻辑
     val handleBack = {
@@ -67,10 +71,16 @@ fun WindowScope.SearchScene(
                 currentPage = SearchScreen.Search
             }
             SearchScreen.Search -> {
-                // 从搜索页返回时，先清空搜索状态
-                vm.clear()
-                // 然后返回主页
-                onClickBack()
+                if (!isClicking) {
+                    isClicking = true
+                    vm.clear()
+                    onClickBack()
+                    // 延迟重置点击状态
+                    scope.launch {
+                        delay(2000)
+                        isClicking = false
+                    }
+                }
             }
         }
     }
@@ -143,7 +153,6 @@ private fun WindowScope.SearchResult(
                             ),
                             shape = RoundedCornerShape(12.dp),
                             onClick = {
-                                vm.clear()
                                 onClickBack()
                             }
                         ) {

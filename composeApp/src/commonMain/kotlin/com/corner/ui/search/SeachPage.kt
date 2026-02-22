@@ -67,7 +67,6 @@ fun WindowScope.SearchPage(vm: SearchViewModel, onClickBack: () -> Unit, onSearc
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
                             onClick = {
-                                vm.clear()
                                 onClickBack()
                             },
                             shape = RoundedCornerShape(12.dp)
