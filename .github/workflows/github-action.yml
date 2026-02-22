@@ -250,7 +250,9 @@ jobs:
           mkdir -p ./release-files
           
           # 复制应用程序包
-          find . -name "*.zip" -o -name "*.deb" -o -name "*.msi" -o -name "*.dmg" -exec cp {} ./release-files/ \;
+          cp ./win-file/* ./release-files/ 2>/dev/null || true
+          cp ./linux-file/* ./release-files/ 2>/dev/null || true
+          cp ./mac-file/* ./release-files/ 2>/dev/null || true
           
           # 复制 updater 文件
           find . -path "*/updater-linux-amd64/updater-linux-amd64" -exec cp {} ./release-files/ \;
