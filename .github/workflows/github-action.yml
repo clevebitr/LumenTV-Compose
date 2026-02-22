@@ -94,9 +94,8 @@ jobs:
       - name: 🏗️ Build LumenTV Windows
         run: |
           echo "🔨 开始构建 LumenTV Windows 版本"
-          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
-          ./gradlew createReleaseDistributable --quiet --console=plain -Porg.gradle.warning.mode=none
-
+            ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain
+            ./gradlew createReleaseDistributable --quiet --console=plain
       - name: 📦 Package Windows application
         shell: pwsh
         run: |
@@ -149,9 +148,8 @@ jobs:
         run: |
           chmod +x ./gradlew
           echo "🔨 开始构建 LumenTV Linux 版本"
-            ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
-            ./gradlew createReleaseDistributable --quiet --console=plain -Porg.gradle.warning.mode=none
-
+          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain
+          ./gradlew createReleaseDistributable --quiet --console=plain
       - name: 📦 Package Linux application
         run: |
           echo "1. 📦 构建 LumenTV Linux 包"
@@ -216,7 +214,7 @@ jobs:
         run: |
           chmod +x ./gradlew
           echo "🔨 开始构建 LumenTV macOS 版本"
-          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain -Porg.gradle.warning.mode=none
+          ./gradlew packageReleaseDistributionForCurrentOS --quiet --console=plain
 
       - name: 🏗️ Create distributable
         run: ./gradlew createReleaseDistributable
