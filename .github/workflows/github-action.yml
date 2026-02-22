@@ -100,12 +100,23 @@ jobs:
       - name: 📦 Package Windows application
         shell: pwsh
         run: |
+          # 移动 MSI 文件到根目录
+          $msiFiles = Get-ChildItem -Path "./composeApp/build/compose/binaries/main-release/msi" -Filter "*.msi" -ErrorAction SilentlyContinue
+          if ($msiFiles) {
+            $msiFiles | ForEach-Object {
+              Move-Item $_.FullName "./$($_.Name)" -Force
+              Write-Host "✅ MSI 文件已移动: $($_.Name)"
+            }
+          }
+          
+          # 创建并移动 ZIP 文件
           $appPath = "./composeApp/build/compose/binaries/main-release/app/LumenTV"
           if (Test-Path $appPath) {
-            Compress-Archive -Path "$appPath" -DestinationPath "./LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip"
-            echo "✅ Windows 应用包已创建"
+            $zipName = "LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip"
+            Compress-Archive -Path "$appPath" -DestinationPath "./$zipName" -Force
+            Write-Host "✅ Windows ZIP 包已创建: $zipName"
           } else {
-            echo "❌ 应用目录不存在: $appPath"
+            Write-Host "❌ 应用目录不存在: $appPath"
             exit 1
           }
 
@@ -140,11 +151,17 @@ jobs:
 
       - name: 📦 Package Linux application
         run: |
+          # 移动 DEB 文件到根目录
+          find ./composeApp/build/compose/binaries/main-release/deb -name "*.deb" -exec mv {} ./ \; 2>/dev/null || true
+          
+          # 创建并移动 ZIP 文件
           APP_DIR="./composeApp/build/compose/binaries/main-release/app/LumenTV"
           if [ -d "$APP_DIR" ]; then
+            ZIP_NAME="LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip"
             cd ./composeApp/build/compose/binaries/main-release/app
-            zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./LumenTV
-            echo "✅ Linux 应用包已创建"
+            zip -q -r "../../../../../$ZIP_NAME" ./LumenTV
+            cd ../../../../../
+            echo "✅ Linux ZIP 包已创建: $ZIP_NAME"
           else
             echo "❌ 应用目录不存在: $APP_DIR"
             exit 1
@@ -183,10 +200,15 @@ jobs:
 
       - name: 📦 Package macOS application
         run: |
+          # 移动 DMG 文件到根目录
+          find ./composeApp/build/compose/binaries/main-release/dmg -name "*.dmg" -exec mv {} ./ \; 2>/dev/null || true
+          
+          # 创建并移动 ZIP 文件
           APP_PATH="./composeApp/build/compose/binaries/main-release/app/LumenTV.app"
           if [ -d "$APP_PATH" ]; then
-            zip -q -r "./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$APP_PATH"
-            echo "✅ macOS 应用包已创建"
+            ZIP_NAME="LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip"
+            zip -q -r "./$ZIP_NAME" "$APP_PATH"
+            echo "✅ macOS ZIP 包已创建: $ZIP_NAME"
           else
             echo "❌ 应用目录不存在: $APP_PATH"
             exit 1
