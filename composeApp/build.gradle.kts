@@ -121,6 +121,8 @@ compose.desktop {
             isEnabled.set(true)
             version.set("7.7.0")
             configurationFiles.from(project.file("src/desktopMain/rules.pro"))
+            obfuscate.set(false)
+            optimize.set(true)
         }
 
         jvmArgs("-Dfile.encoding=UTF-8")

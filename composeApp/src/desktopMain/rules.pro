@@ -1,6 +1,49 @@
 -printmapping build/release-mapping.txt
 -libraryjars  <java.home>/jmods/java.base.jmod(!**.jar;!module-info.class)
 
+# 核心保持规则
+-keep class com.corner.** { *; }
+-keep class MainKt { *; }
+
+# 第三方库核心保持
+-keep class io.ktor.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep class kotlinx.serialization.** { *; }
+-keep class org.koin.** { *; }
+-keep class androidx.compose.** { *; }
+-keep class com.seiko.imageloader.** { *; }
+
+# 数据库相关
+-keep class com.corner.database.** { *; }
+-keep class androidx.room.** { *; }
+
+# 网络和工具
+-keep class okhttp3.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class org.json.** { *; }
+-keep class cn.hutool.** { *; }
+
+# 多媒体相关
+-keep class uk.co.caprica.vlcj.** { *; }
+-keep class org.jupnp.** { *; }
+
+# 日志框架
+-keep class ch.qos.logback.** { *; }
+-keep class org.apache.logging.log4j.** { *; }
+
+# 关键优化：禁止所有警告和笔记输出
+-dontwarn **
+-dontnote **
+-dontusemixedcaseclassnames
+
+# 特别针对 ANTLR 的警告
+-dontwarn org.antlr.v4.runtime.**
+-dontnote org.antlr.v4.runtime.**
+
+# 保留必要属性
+-keepattributes Signature,InnerClasses,*Annotation*
+
+
 -keep class org.jboss.marshalling.** {*;}
 #-keep class org.conscrypt.** {*;}
 -keep class org.sqlite.** {*;}
