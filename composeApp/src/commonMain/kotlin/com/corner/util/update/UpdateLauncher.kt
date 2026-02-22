@@ -7,10 +7,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
@@ -126,6 +130,8 @@ class UpdateLauncher {
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING
                     )
                     log.info("Updater moved from local to: $targetFile")
+                    // 设置执行权限
+                    setExecutePermission(targetFile)
                     return targetFile
                 } catch (e: Exception) {
                     log.error("Failed to move updater from local directory", e)
@@ -139,11 +145,10 @@ class UpdateLauncher {
                     val client = HttpClient()
                     val response: HttpResponse = client.get(url)
                     val channel: ByteReadChannel = response.body()
-                    val zipTempFile = File(updaterDir.toFile(), "${updaterName}.zip.tmp")
 
-                    // 下载ZIP文件
+                    // 直接写入二进制文件，不需要ZIP
                     withContext(Dispatchers.IO) {
-                        val fileOutputStream = zipTempFile.outputStream()
+                        val fileOutputStream = targetFile.outputStream()
                         try {
                             val buffer = ByteArray(8192)
                             var bytesRead: Int
@@ -157,82 +162,84 @@ class UpdateLauncher {
                         }
                     }
 
-                    // 解压ZIP文件
-                    extractUpdaterFromZip(zipTempFile, targetFile)
-
-                    // 删除临时ZIP文件
-                    zipTempFile.delete()
-
-                    // 设置执行权限 (Linux/macOS)
-                    if (UserDataDirProvider.currentOs != OperatingSystem.Windows) {
-                        targetFile.setExecutable(true)
-                    }
+                    // 设置执行权限
+                    setExecutePermission(targetFile)
 
                     client.close()
-                    log.info("Updater extracted to: $targetFile")
+                    log.info("Updater downloaded to: $targetFile")
                 } catch (e: Exception) {
-                    log.error("Failed to download and extract updater", e)
+                    log.error("Failed to download updater", e)
                 }
             }
 
             return targetFile
         }
 
-        private fun extractUpdaterFromZip(zipFile: File, targetFile: File) {
-            val zipInputStream = java.util.zip.ZipInputStream(zipFile.inputStream())
+        // 设置执行权限
+        private fun setExecutePermission(file: File) {
             try {
-                var entry = zipInputStream.nextEntry
-                while (entry != null) {
-                    // 查找与期望的更新程序名称匹配的条目
-                    if (entry.name.endsWith(targetFile.name)) {
-                        // 创建目标目录
-                        targetFile.parentFile.mkdirs()
-
-                        // 提取文件
-                        val fileOutputStream = targetFile.outputStream()
-                        try {
-                            zipInputStream.copyTo(fileOutputStream)
-                        } finally {
-                            fileOutputStream.close()
+                when (UserDataDirProvider.currentOs) {
+                    OperatingSystem.Linux, OperatingSystem.MacOS -> {
+                        val process = ProcessBuilder("chmod", "+x", file.absolutePath).start()
+                        process.waitFor()
+                        if (process.exitValue() == 0) {
+                            log.info("Execute permission set for: ${file.absolutePath}")
+                        } else {
+                            log.warn("Failed to set execute permission for: ${file.absolutePath}")
                         }
-
-                        log.info("Extracted updater file: ${targetFile.absolutePath}")
-                        break
                     }
-                    entry = zipInputStream.nextEntry
+                    OperatingSystem.Windows -> {
+                        // Windows不需要额外设置执行权限
+                        log.info("Windows file ready: ${file.absolutePath}")
+                    }
+                    else -> {
+                        log.warn("Unknown OS, skipping permission setting")
+                    }
                 }
-
-                if (!targetFile.exists()) {
-                    throw Exception("Updater file not found in ZIP: ${targetFile.name}")
-                }
-            } finally {
-                zipInputStream.close()
+            } catch (e: Exception) {
+                log.error("Error setting execute permission", e)
             }
         }
 
+        private suspend fun getLatestVersion(): String? {
+            return try {
+                val client = HttpClient()
+                val response = client.get("https://api.github.com/repos/clevebitr/LumenTV-Compose/releases/latest")
+                val json = Json.decodeFromString<JsonObject>(response.bodyAsText())
+                val tagName = json["tag_name"]?.jsonPrimitive?.content
+                client.close()
+                tagName ?: "v1.1.3" // fallback版本
+            } catch (e: Exception) {
+                log.warn("Failed to fetch latest version, using fallback", e)
+                "v1.1.3"
+            }
+        }
 
         private suspend fun getUpdaterUrlFromActions(): String? {
             val platformIdentifier = PlatformDetector.getPlatformIdentifier()
 
+            // 动态获取最新版本
+            val currentVersion = getLatestVersion()
+
             return when (platformIdentifier) {
                 "macos-latest-amd64" ->
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-macos-latest-amd64.zip"
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-macos-amd64"
 
                 "macos-latest-arm64" ->
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-macos-latest-arm64.zip"
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-macos-arm64"
 
                 "ubuntu-latest-amd64" ->
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-amd64.zip"
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-linux-amd64"
 
                 "ubuntu-latest-arm64" ->
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-arm64.zip"
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-linux-arm64"
 
                 "windows-latest-amd64" ->
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-windows-latest-amd64.zip"
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-windows-amd64.exe"
 
                 else -> {
-                    log.warn("Unsupported platform: $platformIdentifier, falling back to ubuntu-latest-amd64")
-                    "https://nightly.link/clevebitr/LumenTV-Compose/actions/runs/20949175551/updater-binary-ubuntu-latest-amd64.zip"
+                    log.warn("Unsupported platform: $platformIdentifier, falling back to linux-amd64")
+                    "https://github.com/clevebitr/LumenTV-Compose/releases/download/$currentVersion/updater-linux-amd64"
                 }
             }
         }
