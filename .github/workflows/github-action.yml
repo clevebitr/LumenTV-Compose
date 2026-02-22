@@ -154,7 +154,7 @@ jobs:
 
       - name: 📦 Package Linux application
         run: |
-          echo "📦 构建 LumenTV Linux 包"
+          echo "1. 📦 构建 LumenTV Linux 包"
           # 移动 DEB 文件到根目录
           DEB_DIR="./composeApp/build/compose/binaries/main-release/deb"
           if [ -d "$DEB_DIR" ]; then
@@ -165,12 +165,17 @@ jobs:
           fi
           
           # 创建并移动 ZIP 文件
+          echo "2. 📦 构建 LumenTV Linux ZIP 包"
           APP_DIR="./composeApp/build/compose/binaries/main-release/app/LumenTV"
-          echo "📦 构建 LumenTV Linux ZIP 包"
-          echo ls -lh "$APP_DIR"
           if [ -d "$APP_DIR" ]; then
             ZIP_NAME="LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip"
-            # 确保在正确的位置创建 ZIP
+            
+            echo "🔍 检查应用目录内容:"
+            ls -la "$APP_DIR"
+            echo "🔍 完整路径检查:"
+            pwd
+            echo "APP_DIR 变量值: $APP_DIR"
+          
             zip -j -q "./$ZIP_NAME" "$APP_DIR"/*
             echo "✅ Linux ZIP 包已创建: $ZIP_NAME"
             # 验证文件是否存在
