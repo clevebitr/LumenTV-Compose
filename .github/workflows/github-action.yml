@@ -167,10 +167,22 @@ jobs:
           APP_DIR="./composeApp/build/compose/binaries/main-release/app/LumenTV"
           if [ -d "$APP_DIR" ]; then
             ZIP_NAME="LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip"
-            cd ./composeApp/build/compose/binaries/main-release/app
-            zip -q -r "../../../../../$ZIP_NAME" ./LumenTV
-            cd ../../../../../
+            # 确保在正确的位置创建 ZIP
+            zip -j -q "./$ZIP_NAME" "$APP_DIR"/*
             echo "✅ Linux ZIP 包已创建: $ZIP_NAME"
+            # 验证文件是否存在
+            if [ -f "$ZIP_NAME" ]; then
+              echo "✅ ZIP 文件验证通过: $(ls -lh $ZIP_NAME)"
+            else
+              echo "❌ ZIP 文件未找到，重新尝试"
+              # 备用方法
+              cd "$APP_DIR/.."
+              zip -q "../$ZIP_NAME" ./LumenTV
+              cd ../..
+              if [ -f "$ZIP_NAME" ]; then
+                echo "✅ 备用方法成功: $(ls -lh $ZIP_NAME)"
+              fi
+            fi
           else
             echo "❌ 应用目录不存在: $APP_DIR"
             exit 1
