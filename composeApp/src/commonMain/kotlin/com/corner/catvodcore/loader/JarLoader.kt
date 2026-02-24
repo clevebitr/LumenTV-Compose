@@ -191,7 +191,7 @@ object JarLoader {
                 return null
             }
 
-            val safeParams = params.toMap() // 保持原值，避免不必要的 Base64 检查
+            val safeParams = params.toMap()
 
             val result = proxy.invoke(null, safeParams)
             return if (result != null && result::class.java.isArray) {
