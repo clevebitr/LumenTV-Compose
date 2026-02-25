@@ -3,9 +3,6 @@ package com.corner.util.play
 import com.corner.ui.nav.vm.DetailViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import java.awt.Desktop
-import java.io.File
-import java.nio.file.Files
 import org.java_websocket.server.WebSocketServer
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
@@ -17,7 +14,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.slf4j.LoggerFactory
-import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -43,37 +39,17 @@ object BrowserUtils {
 
     // 定义一个 CoroutineScope 实例
     val scope = CoroutineScope(Dispatchers.Default)
-    lateinit var detailViewModel: DetailViewModel
+    
+    // 使用可空类型而不是lateinit，避免未初始化异常
+    var detailViewModel: DetailViewModel? = null
 
-    // 静态 HTML 文件
-    private var staticHtmlFile: File? = null
-
-    // 静态 HTML 文件内容
-    private var HTML_TEMPLATE: String? = null
-
-    init {
-        loadHtmlTemplate()
-    }
-
-    private fun loadHtmlTemplate() {
-        try {
-            // 读取 resources 目录下的 web_player.html 文件
-            val inputStream: InputStream = javaClass.classLoader.getResourceAsStream("web_player.html")
-                ?: throw IllegalArgumentException("web_player.html 文件未找到")
-            HTML_TEMPLATE = inputStream.bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
-            log.error("读取 HTML 模板文件失败", e)
-        }
-    }
-
-
-    fun init(detailViewModel: DetailViewModel) {
-        this.detailViewModel = detailViewModel
+    // 添加初始化方法
+    fun initialize(viewModel: DetailViewModel) {
+        detailViewModel = viewModel
+        log.info("BrowserUtils 已初始化 detailViewModel")
     }
 
     // 启动 WebSocket 服务器
-    // 新增标志位，用于记录 WebSocket 服务器是否已经启动
-
     private val isWebSocketServerStarted = AtomicBoolean(false)
 
     fun startWebSocketServer() {
@@ -107,18 +83,28 @@ object BrowserUtils {
 
     // 模拟切换到下一个选集并播放的方法
     fun switchToNextEpisodeAndPlay() {
+        val viewModel = detailViewModel
+        if (viewModel == null) {
+            log.warn("detailViewModel未初始化，无法切换下一集")
+            return
+        }
+        
         scope.launch {
-            val nextEpisodeUrl = detailViewModel.getNextEpisodeUrl()
-            nextEpisodeUrl?.let {
-                // 从 viewModel 的状态中获取当前选中的剧集 URL
-                val currentSelectedEpNumber = detailViewModel.currentSelectedEpNumber
-                // 从状态数据里找到对应的剧集
-                val currentEpisode = detailViewModel.state.value.detail.subEpisode.find { ep ->
-                    ep.number == currentSelectedEpNumber
+            try {
+                val nextEpisodeUrl = viewModel.getNextEpisodeUrl()
+                nextEpisodeUrl?.let {
+                    // 从 viewModel 的状态中获取当前选中的剧集 URL
+                    val currentSelectedEpNumber = viewModel.currentSelectedEpNumber
+                    // 从状态数据里找到对应的剧集
+                    val currentEpisode = viewModel.state.value.detail.subEpisode.find { ep ->
+                        ep.number == currentSelectedEpNumber
+                    }
+                    val episodeName = viewModel.state.value.detail.vodName ?: ""
+                    val episodeNumber = currentEpisode?.number
+                    openBrowserWithWebPlayer(it, episodeName, episodeNumber)
                 }
-                val episodeName =detailViewModel.state.value.detail.vodName ?: ""
-                val episodeNumber = currentEpisode?.number
-                openBrowserWithHtml(it, episodeName, episodeNumber)
+            } catch (e: Exception) {
+                log.error("切换下一集时发生异常", e)
             }
         }
     }
@@ -145,17 +131,16 @@ object BrowserUtils {
 
 
     /**
-     * 使用浏览器打开包含指定 M3U8 视频链接的 HTML 文件。
-     * 该方法会复用静态 HTML 文件，仅更新文件中的 M3U8 链接，
-     * 并使用系统默认浏览器打开该文件。同时会进行防重复打开检查，
-     * 并确保 WebSocket 服务器已启动且监听已开启。
+     * 使用WebPlayerServer在浏览器中播放视频
+     * 该方法会启动WebPlayerServer并在浏览器中打开播放页面
      *
-     * @param m3u8Url 要播放的 M3U8 视频链接。
-     * @param episodeName 剧集名称。
-     * @param episodeNumber 集数。
+     * @param videoUrl 要播放的视频链接
+     * @param episodeName 剧集名称
+     * @param episodeNumber 集数
+     * @param timeProvider 时间提供者（用于测试）
      */
-    fun openBrowserWithHtml(
-        m3u8Url: String,
+    fun openBrowserWithWebPlayer(
+        videoUrl: String,
         episodeName: String? = null,
         episodeNumber: Int? = null,
         timeProvider: TimeProvider = DefaultTimeProvider()
@@ -171,45 +156,25 @@ object BrowserUtils {
             startWebSocketServer()
             // 启动监听，当接收到视频播放完成事件时处理下一集
             startListening()
-            // 检查当前系统是否支持桌面操作，并且支持使用浏览器打开链接
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                try {
-                    if (staticHtmlFile == null) {
-                        // 创建一个临时目录用于存放 HTML 文件
-                        val tempDir = Files.createTempDirectory("m3u8-player").toFile()
-                        // 程序退出时删除临时目录
-                        tempDir.deleteOnExit()
-
-                        // 创建静态 HTML 文件
-                        staticHtmlFile = File(tempDir, "player.html").apply {
-                            writeText(HTML_TEMPLATE ?: "")
-                            // 程序退出时删除临时 HTML 文件
-                            deleteOnExit()
-                        }
-                    }
-
-                    // 更新 HTML 文件中的 M3U8 链接和视频标题
-                    val videoTitle = if (episodeNumber != null && episodeNumber != -1) {
-                        "$episodeName 第 $episodeNumber 集"
-                    } else {
-                        episodeName ?: ""
-                    }
-
-                    // 更新 HTML 文件中的 M3U8 链接、剧集名称和集数
-                    val updatedHtmlContent = HTML_TEMPLATE
-                        ?.replace("%M3U8_URL%", m3u8Url)
-                        ?.replace("%VIDEO_TITLE%", videoTitle)
-
-                    updatedHtmlContent?.let { staticHtmlFile?.writeText(it) }
-
-                    // 使用系统默认浏览器打开临时 HTML 文件
-                    Desktop.getDesktop().browse(staticHtmlFile!!.toURI())
-                    // 记录使用浏览器打开本地 HTML 文件的日志
-                    log.info("使用浏览器打开本地 HTML 文件: {}", staticHtmlFile!!.absolutePath)
-                } catch (e: Exception) {
-                    // 捕获异常并打印堆栈信息
-                    e.printStackTrace()
+            
+            try {
+                // 使用WebPlayerServer打开浏览器
+                val title = if (episodeNumber != null && episodeNumber != -1) {
+                    "$episodeName 第 $episodeNumber 集"
+                } else {
+                    episodeName ?: "视频播放"
                 }
+                
+                WebPlayerServer.openInBrowser(
+                    mediaUrl = videoUrl,
+                    title = title,
+                    episodeNumber = episodeNumber
+                )
+                
+                log.info("使用WebPlayerServer在浏览器中打开视频: $title")
+            } catch (e: Exception) {
+                log.error("使用WebPlayerServer打开浏览器失败", e)
+                e.printStackTrace()
             }
         }
     }
@@ -222,6 +187,15 @@ object BrowserUtils {
         } else {
             log.info("WebSocket 服务器未运行，跳过停止操作")
         }
+        
+        // 停止WebPlayerServer
+        if (WebPlayerServer.isServerRunning()) {
+            WebPlayerServer.stop()
+            log.info("WebPlayerServer已停止")
+        }
+        
+        // 清空detailViewModel引用
+        detailViewModel = null
     }
 }
 
@@ -239,7 +213,6 @@ object VideoEventServer : WebSocketServer(InetSocketAddress("localhost", 8888)) 
         isVideoPlaying = false
         // 连接建立后，更新 WebSocket 连接状态为已连接
         BrowserUtils._webSocketConnectionState.value = true
-//        log.debug("WebSocket 连接状态：{}",BrowserUtils._webSocketConnectionState.value)
     }
 
     override fun onClose(conn: WebSocket?, code: Int, reason: String?, remote: Boolean) {
@@ -247,7 +220,7 @@ object VideoEventServer : WebSocketServer(InetSocketAddress("localhost", 8888)) 
         // 若视频正在播放，说明是中途退出，更新 WebSocket 连接状态为未连接
         if (isVideoPlaying) {
             BrowserUtils._webSocketConnectionState.value = false
-            log.debug("更新WebSocket 连接状态：{}",BrowserUtils._webSocketConnectionState.value)
+            log.debug("更新WebSocket 连接状态：{}", BrowserUtils._webSocketConnectionState.value)
         }
     }
 

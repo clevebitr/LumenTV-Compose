@@ -105,7 +105,7 @@ fun PngFoundDialog(
                                 // 记录用户选择在浏览器打开
                                 DialogState.userChoseOpenInBrowser = true
                                 pngLog.debug("Name is {},Number is {}",episodeName,episodeNumber)
-                                BrowserUtils.openBrowserWithHtml(m3u8Url,episodeName,episodeNumber)
+                                BrowserUtils.openBrowserWithWebPlayer(m3u8Url,episodeName,episodeNumber)
                                 onDismiss()
                             },
                             modifier = Modifier.weight(1f),

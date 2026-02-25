@@ -98,11 +98,6 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
         }
     }
 
-    // 初始化 BrowserUtils
-    LaunchedEffect(Unit) {
-        BrowserUtils.init(vm)
-    }
-
     // 监听isFullScreen, 非全屏时请求焦点
     LaunchedEffect(isFullScreen.value) {
         if (!isFullScreen.value) {
@@ -255,7 +250,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                             val episodeName = model.detail.vodName ?: ""
                             val episodeNumber = currentEpisode?.number ?: 0
                             log.debug("Name is {},Number is {}", episodeName, episodeNumber)
-                            BrowserUtils.openBrowserWithHtml(localCurrentM3U8Url, episodeName, episodeNumber)
+                            BrowserUtils.openBrowserWithWebPlayer(localCurrentM3U8Url, episodeName, episodeNumber)
                             localShowPngDialog = false
                             DialogState.dismissPngDialog()
                         },

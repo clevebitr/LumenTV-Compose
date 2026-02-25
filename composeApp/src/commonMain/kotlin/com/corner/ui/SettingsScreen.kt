@@ -652,7 +652,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            PlayerType.entries.filter { it.id != PlayerType.Web.id }.forEach { type ->
+                            PlayerType.entries.forEach { type ->
                                 AssistChip(
                                     onClick = {
                                         SettingStore.setValue(
@@ -766,7 +766,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                             }
                         }
                         Text(
-                            text = "播放器可配置为内部播放器、外部播放器;如果选择外部播放器,需要配置外置播放器路径才能播放视频",
+                            text = "播放器可配置为内部播放器、外部播放器或浏览器播放器;如果选择外部播放器,需要配置外置播放器路径才能播放视频",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -1310,7 +1310,7 @@ fun AboutDialog(
                         )
 
                         Text(
-                            text = "1.1.3",
+                            text = "1.1.4",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )

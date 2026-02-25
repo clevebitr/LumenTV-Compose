@@ -30,6 +30,8 @@ import com.corner.ui.player.vlcj.VlcJInit
 import com.corner.ui.player.vlcj.VlcjFrameController
 import com.corner.util.Constants
 import com.corner.util.cancelAll
+import com.corner.util.play.BrowserUtils
+import com.corner.util.play.BrowserUtils.openBrowserWithWebPlayer
 import com.corner.util.play.Play
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +88,7 @@ class DetailViewModel : BaseViewModel() {
     var isDownloadUrl = MutableStateFlow<Boolean>(false)
 
     init {
+        BrowserUtils.initialize(this)
         scope.launch {
             controller.state.collect { playerState ->
                 when (playerState.state) {
@@ -577,6 +580,9 @@ class DetailViewModel : BaseViewModel() {
                 launched = false
 
                 //supervisor.cancelChildren() // 取消所有子任务
+                // 清理 BrowserUtils
+                BrowserUtils.cleanup()
+                BrowserUtils.detailViewModel = null
 
                 log.debug("----------清理详情页资源完成----------")
 
@@ -856,6 +862,14 @@ class DetailViewModel : BaseViewModel() {
                     SnackBar.postMsg("即将播放" + ": ${ep.name}", type = SnackBar.MessageType.INFO)
                     _state.update { it.copy(isBuffering = false) }
                     Play.start(result.url.v(), ep.name)
+                }
+            }
+
+            PlayerType.Web.id -> {
+                scope.launch {
+                    SnackBar.postMsg("即将播放" + ": ${ep.name}", type = SnackBar.MessageType.INFO)
+                    _state.update { it.copy(isBuffering = false) }
+                    openBrowserWithWebPlayer(result.url.v(), ep.name,ep.number)
                 }
             }
         }

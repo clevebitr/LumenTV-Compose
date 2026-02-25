@@ -74,6 +74,11 @@ kotlin {
                 implementation("io.ktor:ktor-server-swagger:$ktorVer")
                 implementation("io.ktor:ktor-client-core:$ktorVer")
                 implementation("io.ktor:ktor-client-okhttp:$ktorVer")
+                implementation("io.ktor:ktor-server-html-builder:${ktorVer}")
+                implementation("io.ktor:ktor-server-websockets:${ktorVer}")
+
+                //kotlinx-html
+                implementation("org.jetbrains.kotlinx:kotlinx-html:0.11.0")
 
                 // log
                 implementation("ch.qos.logback:logback-classic:$logbackVer")
