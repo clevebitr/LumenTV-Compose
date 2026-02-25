@@ -18,7 +18,6 @@ private val log = LoggerFactory.getLogger("WebPlayerServer")
 
 object WebPlayerServer {
     private var server: EmbeddedServer<*, *>? = null // 使用泛型通配符
-    private val scope = CoroutineScope(Dispatchers.IO + Job())
     private val isRunning = AtomicBoolean(false)
     private val portCounter = AtomicInteger(9000)
     private var currentPort = 0
