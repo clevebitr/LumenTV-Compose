@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -870,9 +869,7 @@ private fun LabeledText(
 
 /**
  * 剧集选择器
- * @param epSize 剧集数量
- * @param currentTabIndex 当前批次索引
- * @param onBatchClick 批次点击事件
+ * @param vm 模型
  * @param modifier 修饰符
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -925,10 +922,11 @@ fun EpChooser(vm: DetailViewModel, modifier: Modifier) {
 
 /**
  * 剧集选择器
- * @param epSize 剧集数量
- * @param currentTabIndex 当前批次索引
- * @param onBatchClick 批次点击事件
+ * @param episodes 剧集列表
+ * @param currentEp 选择的剧集
+ * @param onEpisodeClick 点击剧集事件
  * @param modifier 修饰符
+ * @param scope 协程作用域
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
