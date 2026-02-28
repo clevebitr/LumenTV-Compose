@@ -17,6 +17,9 @@ private val log = LoggerFactory.getLogger("Hot")
 @Serializable
 data class Hot(val data: List<HotData>) {
     companion object {
+        /**
+         * 获取热搜列表
+         */
         @OptIn(ExperimentalSerializationApi::class)
         fun getHotList() {
             SiteViewModel.viewModelScope.launch {

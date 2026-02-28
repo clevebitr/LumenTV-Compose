@@ -43,6 +43,9 @@ object SpiderTestUtil {
     private val _spiderStatusMap = MutableStateFlow<Map<String, SpiderStatus>>(emptyMap())
     val spiderStatusMapFlow: StateFlow<Map<String, SpiderStatus>> = _spiderStatusMap.asStateFlow()
 
+    /**
+     * 爬虫状态流
+     */
     private val _spiderStatusFlow = MutableStateFlow<Map<String, SpiderStatus>>(emptyMap())
     val spiderStatusFlow: StateFlow<Map<String, SpiderStatus>> = _spiderStatusFlow.asStateFlow()
 
@@ -57,6 +60,9 @@ object SpiderTestUtil {
         UNKNOWN, AVAILABLE, UNAVAILABLE, TESTING
     }
 
+    /**
+     * 初始化爬虫状态
+     * */
     suspend fun initializeSpiderStatuses() {
         try {
             val dbStatuses = Db.database.getSpiderStatusDao().getAll()

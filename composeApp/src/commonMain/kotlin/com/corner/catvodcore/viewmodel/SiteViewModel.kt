@@ -250,7 +250,7 @@ object SiteViewModel {
                 && !urlStr.trim().endsWith(".m3u8", ignoreCase = true)
 
         if (isSpecialLink) {
-            log.debug("Detected special M3U8-like link (not ending with .m3u8): $urlStr")
+            log.debug("发现特殊链接(包含.m3u8但不以.m3u8结尾): $urlStr")
             // 根据用户选择更新状态
             if (!DialogState.userChoseOpenInBrowser) {
                 DialogState.showPngDialog(urlStr)

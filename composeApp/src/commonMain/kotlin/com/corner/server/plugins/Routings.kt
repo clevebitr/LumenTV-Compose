@@ -16,11 +16,26 @@ import java.io.InputStream
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
+import java.util.concurrent.TimeUnit
 
 fun Application.configureRouting() {
 
     routing {
+        // 处理 CORS 预检请求
+        options("/video/proxy") {
+            call.response.header("Access-Control-Allow-Origin", call.request.headers["Origin"] ?: "*")
+            call.response.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            call.response.header("Access-Control-Allow-Headers", "*")
+            call.response.header("Access-Control-Allow-Credentials", "true")
+            call.respond(HttpStatusCode.OK)
+        }
+
+        /**
+         * 静态资源
+         */
         staticResources("/static", "assets") {
             contentType {
                 val suffix = FileNameUtil.getSuffix(it.path)
@@ -34,6 +49,10 @@ fun Application.configureRouting() {
                 }
             }
         }
+
+        /**
+         * 根目录
+         */
         get("/") {
             val htmlFile = File("src/commonMain/resources/LumenTV Proxy Placeholder Webpage.html")
             if (htmlFile.exists()) {
@@ -42,6 +61,10 @@ fun Application.configureRouting() {
                 call.respondText("文件未找到", status = HttpStatusCode.NotFound)
             }
         }
+
+        /**
+         * 弹窗消息
+         */
         get("/postMsg") {
             val msg = call.request.queryParameters["msg"]
             if (msg?.isBlank() == true) {
@@ -50,7 +73,9 @@ fun Application.configureRouting() {
             }
             SnackBar.postMsg(msg!!)
         }
+
         /**
+         * 代理
          * 播放器必须支持range请求 否则会返回完整资源 导致拨动进度条加载缓慢
          */
         get("/proxy") {
@@ -117,6 +142,131 @@ fun Application.configureRouting() {
             }
         }
 
+        /**
+         * web播放器视频代理
+         */
+        get("/video/proxy") {
+            val url = call.request.queryParameters["url"] ?: run {
+                call.respond(HttpStatusCode.BadRequest, "缺少URL参数")
+                return@get
+            }
+
+            // 添加基本的安全检查
+            if (url.isBlank() || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+                call.respond(HttpStatusCode.BadRequest, "无效的URL格式")
+                return@get
+            }
+
+            val client = OkHttpClient.Builder()
+                .followRedirects(true)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+
+            try {
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    // 添加常见的视频请求头
+                    .addHeader(
+                        "User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    )
+                    .addHeader("Accept", "*/*")
+                    .addHeader("Connection", "keep-alive")
+                    .addHeader("Accept-Encoding", "gzip, deflate, br")
+                    .addHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+
+                // 转发客户端的重要请求头
+                call.request.headers["Range"]?.let { range ->
+                    requestBuilder.addHeader("Range", range)
+                }
+                call.request.headers["Referer"]?.let { referer ->
+                    requestBuilder.addHeader("Referer", referer)
+                }
+                call.request.headers["Origin"]?.let { origin ->
+                    requestBuilder.addHeader("Origin", origin)
+                }
+
+                val response = client.newCall(requestBuilder.build()).execute()
+
+                // 检查响应状态
+                if (!response.isSuccessful && response.code != HttpStatusCode.PartialContent.value) {
+                    val errorMsg = "上游服务器错误: ${response.code} ${response.message}"
+                    log.warn("视频代理请求失败: URL=$url, Status=${response.code}")
+                    response.close()
+                    call.respond(HttpStatusCode.BadGateway, errorMsg)
+                    return@get
+                }
+
+                // 转发重要的响应头
+                response.headers.names().forEach { name ->
+                    val values = response.headers(name)
+                    if (!HttpHeaders.isUnsafe(name) &&
+                        name != "Transfer-Encoding" &&
+                        name != "Connection" &&
+                        name.lowercase() !in listOf(
+                            "access-control-allow-origin",
+                            "access-control-allow-methods",
+                            "access-control-allow-headers"
+                        )
+                    ) {
+                        val value = if (values.size == 1) values[0] else values.joinToString(", ")
+                        call.response.headers.append(name, value)
+                    }
+                }
+
+                // 特别处理m3u8和视频内容类型
+                val contentType = when {
+                    response.header("Content-Type")?.contains("m3u8") == true ->
+                        ContentType.parse("application/vnd.apple.mpegurl")
+
+                    response.header("Content-Type")?.contains("mpegurl") == true ->
+                        ContentType.parse("application/vnd.apple.mpegurl")
+
+                    response.header("Content-Type")?.contains("video") == true ->
+                        response.header("Content-Type")?.let { ContentType.parse(it) }
+                            ?: ContentType.Video.MPEG
+
+                    else ->
+                        response.header("Content-Type")?.let { ContentType.parse(it) }
+                            ?: ContentType.Application.OctetStream
+                }
+
+                // 设置正确的状态码
+                val statusCode = when {
+                    response.code == HttpStatusCode.PartialContent.value -> HttpStatusCode.PartialContent
+                    response.isSuccessful -> HttpStatusCode.OK
+                    else -> HttpStatusCode.fromValue(response.code)
+                }
+
+                call.respondOutputStream(
+                    status = statusCode,
+                    contentType = contentType
+                ) {
+                    response.body.byteStream().use { input ->
+                        try {
+                            input.transferTo(this)
+                        } catch (e: IOException) {
+                            log.warn("视频流传输中断: ${e.message}")
+                        }
+                    }
+                }
+
+            } catch (e: SocketTimeoutException) {
+                log.error("视频代理请求超时: URL=$url", e)
+                call.respond(HttpStatusCode.GatewayTimeout, "请求超时")
+            } catch (e: ConnectException) {
+                log.error("视频代理连接失败: URL=$url", e)
+                call.respond(HttpStatusCode.BadGateway, "无法连接到目标服务器")
+            } catch (e: Exception) {
+                log.error("视频代理请求失败: URL=$url", e)
+                call.respond(HttpStatusCode.BadGateway, "代理请求失败: ${e.message ?: "未知错误"}")
+            }
+        }
+
+        /**
+         * 代理m3u8文件
+         */
         get("/proxy/m3u8") {
             val encodedUrl = call.request.queryParameters["url"] ?: run {
                 errorResp(call, "URL参数缺失")
@@ -149,6 +299,10 @@ fun Application.configureRouting() {
                 errorResp(call, "代理请求失败: ${e.message}")
             }
         }
+
+        /**
+         * 代理已缓存的m3u8文件
+         */
         get("/proxy/cached_m3u8") {
             val id = call.request.queryParameters["id"] ?: run {
                 call.respond(HttpStatusCode.BadRequest, "Missing cache ID")
@@ -165,6 +319,9 @@ fun Application.configureRouting() {
     }
 }
 
+/**
+ * 错误响应
+ */
 suspend fun errorResp(call: ApplicationCall) {
     call.respondText(
         text = HttpStatusCode.InternalServerError.description,
@@ -173,6 +330,9 @@ suspend fun errorResp(call: ApplicationCall) {
     ) {}
 }
 
+/**
+ * 错误响应
+ */
 suspend fun errorResp(call: ApplicationCall, msg: String) {
     call.respondText(
         text = msg,

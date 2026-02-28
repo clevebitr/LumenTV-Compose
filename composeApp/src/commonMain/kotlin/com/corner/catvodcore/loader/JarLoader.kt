@@ -19,13 +19,35 @@ import java.util.concurrent.ConcurrentHashMap
 
 object JarLoader {
     private val log = thisLogger()
+
+    /**
+     * jar包加载器
+     * */
     private val loaders: ConcurrentHashMap<String, URLClassLoader> by lazy { ConcurrentHashMap() }
-    //proxy method
+
+    /**
+     * 缓存
+     */
     private val methods: ConcurrentHashMap<String, Method> by lazy { ConcurrentHashMap() }
+
+    /**
+     * 爬虫缓存
+     */
     private val spiders: ConcurrentHashMap<String, Spider> by lazy { ConcurrentHashMap() }
+
+    /**
+     * 最近使用的jar包
+     */
     var recent: String? = null
+
+    /**
+     * 最大重试次数
+     */
     private const val MAX_RETRY_COUNT = 30
 
+    /**
+     * 清空加载的jar包
+     */
     fun clear() {
         log.info("clear jar loader")
         spiders.values.forEach { spider ->
@@ -44,7 +66,6 @@ object JarLoader {
      * @param key
      * @param spider  jar路径
      * */
-
     fun loadJar(key: String, spider: String) {
         var currentRetryCount = 0
         var currentSpider = spider
@@ -117,6 +138,8 @@ object JarLoader {
     }
 
     /**
+     * 解析jar路径
+     *
      * 如果在配置文件种使用的相对路径， 下载的时候使用的全路径 如果判断的md5是否一致的时候使用相对路径 就会造成重复下载
      */
     private fun parseJarUrl(jar: String): String {
@@ -124,13 +147,22 @@ object JarLoader {
         return Urls.convert(ApiConfig.api.url!!, jar)
     }
 
+    /**
+     * 加载jar包
+     * @param key
+     * @param jar  jar文件
+     */
     private fun load(key: String, jar: File) {
-        log.debug("load jar {},jaKey {}", jar,key)
+        log.debug("load jar {},jaKey {}", jar, key)
         loaders[key] = URLClassLoader(arrayOf(jar.toURI().toURL()), this.javaClass.classLoader)
         putProxy(key)
         invokeInit(key)
     }
 
+    /**
+     * 添加代理方法
+     * @param key
+     */
     private fun putProxy(key: String) {
         try {
             val clazz = loaders[key]?.loadClass(Constant.catVodProxy)
@@ -141,6 +173,10 @@ object JarLoader {
         }
     }
 
+    /**
+     * 调用初始化方法
+     * @param key
+     */
     private fun invokeInit(key: String) {
         try {
             val clazz = loaders[key]?.loadClass(Constant.catVodInit)
@@ -151,6 +187,14 @@ object JarLoader {
         }
     }
 
+    /**
+     * 获取爬虫
+     * @param key
+     * @param api
+     * @param ext
+     * @param jar
+     * @return
+     */
     fun getSpider(key: String, api: String, ext: String, jar: String): Spider {
         try {
             val jaKey = Utils.md5(jar)
@@ -171,6 +215,11 @@ object JarLoader {
         }
     }
 
+    /**
+     * 下载jar包
+     * @param jar
+     * @return
+     */
     private fun download(jar: String): File {
         val jarPath = Paths.jar(jar)
         log.debug("download jar file {} to:{}", jar, jarPath)
@@ -181,6 +230,11 @@ object JarLoader {
         }
     }
 
+    /**
+     * 代理调用
+     * @param params
+     * @return
+     */
     fun proxyInvoke(params: Map<String, String>): Array<Any>? {
         return try {
             val md5 = Utils.md5(recent ?: "")
@@ -206,6 +260,9 @@ object JarLoader {
         }
     }
 
+    /**
+     * 设置最近使用的jar包
+     */
     fun setRecentJar(jar: String?) {
         recent = jar
     }

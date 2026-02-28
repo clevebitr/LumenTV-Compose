@@ -73,11 +73,23 @@ import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("DetailScreen")
 
+/**
+ * 用户手动触发的点击事件——变量
+ */
 var userTriggered by mutableStateOf(false)
+
+/**
+ * 用户手动触发的点击事件
+ */
 fun onUserSelectEpisode() {
     userTriggered = true
 }
 
+/**
+ * 详情页面
+ * @param vm 视图模型
+ * @param onClickBack 返回按钮点击事件
+ */
 @Composable
 fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
     val model by vm.state.collectAsState()
@@ -119,6 +131,9 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
     LaunchedEffect(BrowserUtils.webSocketConnectionState) {
         BrowserUtils.webSocketConnectionState.collect { isConnected ->
             showWebSocketDisconnected = !isConnected
+            if (showWebSocketDisconnected) {
+                log.info("WebSocket链接丢失")
+            }
         }
     }
 
@@ -225,7 +240,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
             }
 
             TopNotification(
-                show = showWebSocketDisconnected && openDialogState,
+                show = showWebSocketDisconnected,
                 vm = vm,
                 scope = scope,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
@@ -519,6 +534,10 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
     }
 }
 
+/**
+ * 线路选择
+ * @param vm 视图模型
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun Flags(
@@ -633,6 +652,12 @@ private fun Flags(
     }
 }
 
+/**
+ * 快速搜索结果
+ * @param detail 详情
+ * @param component 组件
+ * @param searchResultList 搜索结果列表
+ */
 @Composable
 private fun quickSearchResult(
     detail: DetailScreenState, searchResultList: State<List<Vod>>, component: DetailViewModel
@@ -666,6 +691,10 @@ private fun quickSearchResult(
     }
 }
 
+/**
+ * 详情信息
+ * @param detail 详情
+ */
 @Composable
 private fun VodInfo(detail: Vod?) {
     MaterialTheme.colorScheme
@@ -729,6 +758,13 @@ private fun VodInfo(detail: Vod?) {
     }
 }
 
+/**
+ * 展开/收起文本 组件
+ * @param label 标签
+ * @param content 内容
+ * @param collapsedMaxLines 折叠时的最大行数
+ * @param modifier 修饰符
+ **/
 @Composable
 private fun ExpandableDescription(
     label: String,
@@ -778,7 +814,10 @@ private fun ExpandableDescription(
     }
 }
 
-
+/**
+ * 信息标签
+ * @param text 文本
+ * */
 @Composable
 private fun InfoChip(text: String) {
     Box(
@@ -795,6 +834,14 @@ private fun InfoChip(text: String) {
     }
 }
 
+/**
+ * 标题行
+ * @param label 标签
+ * @param content 内容
+ * @param modifier 修饰符
+ * @param maxLines 最大行数
+ * @param textStyle 文本样式
+ */
 @Composable
 private fun LabeledText(
     label: String,
@@ -821,6 +868,13 @@ private fun LabeledText(
     }
 }
 
+/**
+ * 剧集选择器
+ * @param epSize 剧集数量
+ * @param currentTabIndex 当前批次索引
+ * @param onBatchClick 批次点击事件
+ * @param modifier 修饰符
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EpChooser(vm: DetailViewModel, modifier: Modifier) {
@@ -869,7 +923,13 @@ fun EpChooser(vm: DetailViewModel, modifier: Modifier) {
     }
 }
 
-
+/**
+ * 剧集选择器
+ * @param epSize 剧集数量
+ * @param currentTabIndex 当前批次索引
+ * @param onBatchClick 批次点击事件
+ * @param modifier 修饰符
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EpisodeGrid(
@@ -937,6 +997,13 @@ fun EpisodeGrid(
     }
 }
 
+/**
+ * 剧集批次选择器
+ * @param epSize 剧集数量
+ * @param currentTabIndex 当前批次索引
+ * @param onBatchClick 批次点击事件
+ * @param modifier 修饰符
+ */
 @Composable
 fun EpisodeBatchSelector(
     epSize: Int,
@@ -981,6 +1048,11 @@ fun EpisodeBatchSelector(
     }
 }
 
+/**
+ * 剧集选择器标题行
+ * @param episodeCount 剧集数量
+ * @param modifier 修饰符
+ */
 @Composable
 fun EpisodeTitleRow(
     episodeCount: Int,
@@ -1010,6 +1082,13 @@ fun EpisodeTitleRow(
     }
 }
 
+/**
+ * 顶部提示
+ * @param show 是否显示
+ * @param vm 视图模型
+ * @param scope 作用域
+ * @param modifier 修饰符
+ */
 @Composable
 fun TopNotification(
     show: Boolean,
@@ -1023,7 +1102,7 @@ fun TopNotification(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .background(MaterialTheme.colorScheme.primary)
                     .padding(start = 16.dp, end = 16.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -1033,20 +1112,10 @@ fun TopNotification(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "WebSocket连接已断开，请使用Web播放器",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        text = "WebSocket连接已断开，如果想播放视频请使用Web播放器",
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontWeight = FontWeight.Medium
                     )
-                    IconButton(
-                        onClick = { /* 处理关闭通知 */ },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "关闭通知",
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
                 }
             }
 
@@ -1063,6 +1132,15 @@ fun TopNotification(
     }
 }
 
+/**
+ * 无播放器内容
+ * @param message 提示信息
+ * @param subtitle 子标题
+ * @param videoWidth 视频宽度
+ * @param focus 焦点请求
+ * @param scope 作用域
+ * @param vm 视图模型
+ */
 @Composable
 fun NoPlayerContent(
     message: String,
@@ -1092,6 +1170,13 @@ fun NoPlayerContent(
     }
 }
 
+/**
+ * 剧集项
+ * @param isSelected 是否选中
+ * @param episode 剧集
+ * @param onSelect 选中回调
+ * @param isLoading 是否正在加载
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EpisodeItem(

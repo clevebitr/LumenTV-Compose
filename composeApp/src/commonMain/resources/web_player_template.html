@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>{{title}}</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.12/dist/hls.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #00aaff;
+            --primary-hover: #0088cc;
+            --bg-dark: rgba(0, 0, 0, 0.85);
+            --bg-darker: rgba(0, 0, 0, 0.95);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --border-color: rgba(255, 255, 255, 0.15);
+            --error-color: rgba(255, 0, 0, 0.8);
+            --success-color: rgba(0, 255, 136, 0.8);
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #000;
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+
+        .player-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        #video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .video-info {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: var(--bg-dark);
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            max-width: calc(100% - 32px);
+        }
+
+        .video-info__title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .video-info__meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .video-info__meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .video-info__meta-item::before {
+            content: '•';
+            color: var(--primary-color);
+        }
+
+        .video-info__meta-item:first-child::before {
+            content: '';
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            z-index: 50;
+        }
+
+        .loading-overlay__spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-overlay__text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .error-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--error-color);
+            padding: 24px 32px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            z-index: 100;
+            max-width: 90%;
+        }
+
+        .error-overlay__icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .error-overlay__message {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 320px;
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            z-index: 200;
+            transition: var(--transition);
+            transform: translateX(calc(100% + 16px));
+            opacity: 0;
+        }
+
+        .control-panel.visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .control-panel__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .control-panel__title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .control-panel__close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: var(--transition);
+        }
+
+        .control-panel__close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .control-panel__content {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group__label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .input-group__input {
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .input-group__input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .input-group__input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .toggle-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        .toggle-group__label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle__input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle__slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: var(--transition);
+            border-radius: 12px;
+        }
+
+        .toggle__slider::before {
+            position: absolute;
+            content: '';
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: var(--transition);
+            border-radius: 50%;
+        }
+
+        .toggle__input:checked + .toggle__slider {
+            background-color: var(--primary-color);
+        }
+
+        .toggle__input:checked + .toggle__slider::before {
+            transform: translateX(20px);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .button {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .button--primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .button--primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .button--secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .button--secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .toggle-button {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 44px;
+            height: 44px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 150;
+            transition: var(--transition);
+            backdrop-filter: blur(5px);
+        }
+
+        .toggle-button:hover {
+            background: var(--bg-darker);
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+
+        .toggle-button__icon {
+            font-size: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .player-controls {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+            padding: 12px 16px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .player-controls.visible {
+            opacity: 1;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-bar__filled {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .control-buttons {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .play-pause-btn {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: var(--transition);
+        }
+
+        .play-pause-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .time-display {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 100px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .volume-btn {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: var(--transition);
+        }
+
+        .volume-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .volume-slider {
+            width: 80px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .volume-slider__filled {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                width: 280px;
+                top: 8px;
+                right: 8px;
+            }
+
+            .video-info {
+                top: 8px;
+                left: 8px;
+                padding: 8px 12px;
+            }
+
+            .video-info__title {
+                font-size: 14px;
+            }
+
+            .video-info__meta {
+                font-size: 11px;
+            }
+
+            .toggle-button {
+                width: 40px;
+                height: 40px;
+                top: 8px;
+                right: 8px;
+            }
+
+            .player-controls {
+                bottom: 8px;
+                left: 8px;
+                right: 8px;
+                padding: 8px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="player-wrapper">
+            <video id="video-player" controls></video>
+            
+            <div class="video-info">
+                <div class="video-info__title">{{title}}</div>
+                <div class="video-info__meta">
+                    <span class="video-info__meta-item" id="ep-name">--</span>
+                    <span class="video-info__meta-item" id="ep-number">--</span>
+                </div>
+            </div>
+            
+            <div class="loading-overlay hidden" id="loading">
+                <div class="loading-overlay__spinner"></div>
+                <div class="loading-overlay__text">正在加载...</div>
+            </div>
+            
+            <div class="error-overlay hidden" id="error">
+                <div class="error-overlay__icon">⚠️</div>
+                <div class="error-overlay__message" id="error-message">视频加载失败</div>
+            </div>
+            
+            <div class="player-controls hidden" id="player-controls">
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-bar__filled" id="progress-filled"></div>
+                </div>
+                <div class="control-buttons">
+                    <button class="play-pause-btn" id="play-pause-btn" title="播放/暂停">▶️</button>
+                    <div class="time-display" id="time-display">00:00 / 00:00</div>
+                    <div class="volume-control">
+                        <button class="volume-btn" id="volume-btn" title="静音/取消静音">🔊</button>
+                        <div class="volume-slider" id="volume-slider">
+                            <div class="volume-slider__filled" id="volume-filled"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="toggle-button" id="toggle-panel" title="打开控制面板">
+                <span class="toggle-button__icon">⚙️</span>
+            </button>
+        </div>
+        
+        <div class="control-panel" id="control-panel">
+            <div class="control-panel__header">
+                <span class="control-panel__title">播放控制</span>
+                <button class="control-panel__close" id="close-panel" title="关闭">✕</button>
+            </div>
+            
+            <div class="control-panel__content">
+                <div class="input-group">
+                    <label class="input-group__label" for="video-url">视频链接</label>
+                    <input type="text" id="video-url" class="input-group__input" placeholder="输入视频URL...">
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-group__label" for="video-file">或上传文件</label>
+                    <input type="file" id="video-file" class="input-group__input" accept="*/*">
+                </div>
+                
+                <div class="toggle-group">
+                    <span class="toggle-group__label">智能本地代理</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="proxy-toggle" class="toggle__input" checked>
+                        <span class="toggle__slider"></span>
+                    </label>
+                </div>
+                
+                <div class="button-group">
+                    <button class="button button--primary" id="play-btn">播放</button>
+                    <button class="button button--secondary" id="clear-btn">清空</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        class VideoPlayer {
+            constructor() {
+                this.video = null;
+                this.hls = null;
+                this.ws = null;
+                this.retryCount = 0;
+                this.maxRetries = 3;
+                this.useProxy = true;
+                
+                this.elements = {
+                    video: document.getElementById('video-player'),
+                    loading: document.getElementById('loading'),
+                    error: document.getElementById('error'),
+                    errorMessage: document.getElementById('error-message'),
+                    controlPanel: document.getElementById('control-panel'),
+                    toggleButton: document.getElementById('toggle-panel'),
+                    closeButton: document.getElementById('close-panel'),
+                    videoUrl: document.getElementById('video-url'),
+                    videoFile: document.getElementById('video-file'),
+                    proxyToggle: document.getElementById('proxy-toggle'),
+                    playBtn: document.getElementById('play-btn'),
+                    clearBtn: document.getElementById('clear-btn'),
+                    epName: document.getElementById('ep-name'),
+                    epNumber: document.getElementById('ep-number'),
+                    playerControls: document.getElementById('player-controls'),
+                    playPauseBtn: document.getElementById('play-pause-btn'),
+                    progressBar: document.getElementById('progress-bar'),
+                    progressFilled: document.getElementById('progress-filled'),
+                    timeDisplay: document.getElementById('time-display'),
+                    volumeBtn: document.getElementById('volume-btn'),
+                    volumeSlider: document.getElementById('volume-slider'),
+                    volumeFilled: document.getElementById('volume-filled')
+                };
+                
+                this.mediaUrl = '{{mediaUrl}}';
+                this.videoInfo = {
+                    epName: null,
+                    epNumber: null
+                };
+                
+                this.init();
+            }
+            
+            async init() {
+                this.bindEvents();
+                await this.connectWebSocket();
+                await this.initPlayer();
+            }
+            
+            bindEvents() {
+                this.elements.toggleButton.addEventListener('click', () => this.togglePanel());
+                this.elements.closeButton.addEventListener('click', () => this.togglePanel());
+                this.elements.playBtn.addEventListener('click', () => this.playVideo());
+                this.elements.clearBtn.addEventListener('click', () => this.clearInputs());
+                this.elements.proxyToggle.addEventListener('change', (e) => {
+                    this.useProxy = e.target.checked;
+                });
+                this.elements.videoUrl.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.playVideo();
+                });
+                
+                // 播放器控制事件
+                this.elements.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+                this.elements.progressBar.addEventListener('click', (e) => this.seekVideo(e));
+                this.elements.volumeBtn.addEventListener('click', () => this.toggleMute());
+                this.elements.volumeSlider.addEventListener('click', (e) => this.setVolume(e));
+                
+                // 视频事件
+                this.elements.video.addEventListener('loadedmetadata', () => this.updateDuration());
+                this.elements.video.addEventListener('timeupdate', () => this.updateProgress());
+                this.elements.video.addEventListener('play', () => this.onPlay());
+                this.elements.video.addEventListener('pause', () => this.onPause());
+                this.elements.video.addEventListener('ended', () => this.onEnded());
+                this.elements.video.addEventListener('error', (e) => this.onError(e));
+                this.elements.video.addEventListener('waiting', () => this.showLoading('缓冲中...'));
+                this.elements.video.addEventListener('playing', () => this.hideLoading());
+                
+                // 鼠标悬停显示控制条
+                this.elements.video.addEventListener('mouseenter', () => this.showControls());
+                this.elements.video.addEventListener('mouseleave', () => this.hideControls());
+                this.elements.playerControls.addEventListener('mouseenter', () => this.showControls());
+                this.elements.playerControls.addEventListener('mouseleave', () => this.hideControls());
+            }
+            
+            togglePanel() {
+                this.elements.controlPanel.classList.toggle('visible');
+            }
+            
+            clearInputs() {
+                this.elements.videoUrl.value = '';
+                this.elements.videoFile.value = '';
+            }
+            
+            async connectWebSocket() {
+                if (this.retryCount >= this.maxRetries) {
+                    console.error('WebSocket连接失败，达到最大重试次数');
+                    return;
+                }
+                
+                try {
+                    this.ws = new WebSocket('ws://localhost:8888');
+                    
+                    this.ws.onopen = () => {
+                        console.log('WebSocket连接已建立');
+                        this.retryCount = 0;
+                    };
+                    
+                    this.ws.onclose = () => {
+                        console.log('WebSocket连接已关闭');
+                        setTimeout(() => {
+                            this.retryCount++;
+                            this.connectWebSocket();
+                        }, 2000);
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket错误:', error);
+                    };
+                } catch (error) {
+                    console.error('WebSocket连接异常:', error);
+                    setTimeout(() => {
+                        this.retryCount++;
+                        this.connectWebSocket();
+                    }, 2000);
+                }
+            }
+            
+            async initPlayer() {
+                console.log('初始化播放器:', this.mediaUrl);
+                
+                this.parseVideoInfo(this.mediaUrl);
+                this.updateVideoInfo();
+                
+                if (this.mediaUrl) {
+                    await this.playUrl(this.mediaUrl);
+                }
+            }
+            
+            parseVideoInfo(url) {
+                try {
+                    const urlObj = new URL(url);
+                    const params = new URLSearchParams(urlObj.search);
+                    
+                    this.videoInfo.epName = params.get('epname') || params.get('name') || null;
+                    this.videoInfo.epNumber = params.get('epnumber') || params.get('episode') || null;
+                    
+                    console.log('解析视频信息:', this.videoInfo);
+                } catch (error) {
+                    console.error('解析视频信息失败:', error);
+                }
+            }
+            
+            updateVideoInfo() {
+                if (this.videoInfo.epName) {
+                    this.elements.epName.textContent = this.videoInfo.epName;
+                    this.elements.epName.classList.remove('hidden');
+                } else {
+                    this.elements.epName.classList.add('hidden');
+                }
+                
+                if (this.videoInfo.epNumber) {
+                    this.elements.epNumber.textContent = `第${this.videoInfo.epNumber}集`;
+                    this.elements.epNumber.classList.remove('hidden');
+                } else {
+                    this.elements.epNumber.classList.add('hidden');
+                }
+            }
+            
+            detectVideoType(url) {
+                const lowerUrl = url.toLowerCase();
+                
+                if (lowerUrl.includes('.m3u8')) return 'hls';
+                if (lowerUrl.includes('.mp4')) return 'mp4';
+                if (lowerUrl.includes('.webm')) return 'webm';
+                if (lowerUrl.includes('.flv')) return 'flv';
+                if (lowerUrl.includes('.ts')) return 'ts';
+                
+                return 'auto';
+            }
+            
+            async playVideo() {
+                const url = this.elements.videoUrl.value.trim();
+                const file = this.elements.videoFile.files[0];
+                
+                if (!url && !file) {
+                    alert('请输入视频URL或上传文件');
+                    return;
+                }
+                
+                this.hideError();
+                
+                if (file) {
+                    await this.playFile(file);
+                } else if (url) {
+                    await this.playUrl(url);
+                }
+            }
+            
+            async playFile(file) {
+                this.showLoading('正在加载文件...');
+                
+                try {
+                    const fileUrl = URL.createObjectURL(file);
+                    await this.playUrl(fileUrl);
+                } catch (error) {
+                    console.error('文件播放失败:', error);
+                    this.showError('文件播放失败: ' + error.message);
+                }
+            }
+            
+            async playUrl(url) {
+                this.parseVideoInfo(url);
+                this.updateVideoInfo();
+                
+                const videoType = this.detectVideoType(url);
+                
+                // 智能代理逻辑：避免重复代理
+                let playUrl = url;
+                if (this.useProxy && this.needProxy(url)) {
+                    playUrl = this.getProxyUrl(this.extractOriginalUrl(url));
+                }
+                
+                this.showLoading('正在加载视频...');
+                
+                // 停止之前的播放
+                if (this.hls) {
+                    this.hls.destroy();
+                    this.hls = null;
+                }
+                
+                this.elements.video.pause();
+                this.elements.video.src = '';
+                
+                try {
+                    if (videoType === 'hls') {
+                        await this.playHls(playUrl);
+                    } else {
+                        await this.playNormal(playUrl);
+                    }
+                } catch (error) {
+                    console.error('播放失败:', error);
+                    this.showError('播放失败: ' + error.message);
+                }
+            }
+            
+            async playHls(url) {
+                if (!Hls.isSupported()) {
+                    throw new Error('浏览器不支持HLS播放');
+                }
+                
+                this.hls = new Hls({
+                    enableWorker: false,
+                    lowLatencyMode: true,
+                    backBufferLength: 90
+                });
+                
+                this.hls.loadSource(url);
+                this.hls.attachMedia(this.elements.video);
+                
+                this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('HLS流解析完成');
+                    this.hideLoading();
+                });
+                
+                this.hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS错误:', data);
+                    if (data.fatal) {
+                        this.showError('HLS播放失败');
+                    }
+                });
+            }
+            
+            async playNormal(url) {
+                this.elements.video.src = url;
+                
+                return new Promise((resolve, reject) => {
+                    const onLoaded = () => {
+                        this.elements.video.removeEventListener('loadedmetadata', onLoaded);
+                        this.elements.video.removeEventListener('error', onError);
+                        this.hideLoading();
+                        resolve();
+                    };
+                    
+                    const onError = (e) => {
+                        this.elements.video.removeEventListener('loadedmetadata', onLoaded);
+                        this.elements.video.removeEventListener('error', onError);
+                        reject(new Error('视频加载失败'));
+                    };
+                    
+                    this.elements.video.addEventListener('loadedmetadata', onLoaded);
+                    this.elements.video.addEventListener('error', onError);
+                });
+            }
+            
+            needProxy(url) {
+                // 检查URL是否已经是代理URL
+                if (url.includes('localhost:9978') || url.includes('127.0.0.1:9978')) {
+                    console.log('URL已经是代理URL，跳过代理:', url);
+                    return false;
+                }
+                
+                // 检查是否需要代理（非本地地址）
+                const isLocal = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('192.168.') || url.includes('10.') || url.includes('172.');
+                
+                if (isLocal) {
+                    console.log('本地URL，跳过代理:', url);
+                    return false;
+                }
+                
+                console.log('需要代理的URL:', url);
+                return true;
+            }
+            
+            extractOriginalUrl(url) {
+                // 如果已经是代理URL，提取原始URL
+                if (url.includes('proxy?url=')) {
+                    const urlObj = new URL(url);
+                    const originalUrl = urlObj.searchParams.get('url');
+                    if (originalUrl) {
+                        console.log('从代理URL提取原始URL:', originalUrl);
+                        return decodeURIComponent(originalUrl);
+                    }
+                }
+                return url;
+            }
+            
+            getProxyUrl(url) {
+                const proxyUrl = `http://localhost:9978/video/proxy?url=${encodeURIComponent(url)}`;
+                console.log('使用代理URL:', proxyUrl);
+                return proxyUrl;
+            }
+            
+            // 播放器控制方法
+            togglePlayPause() {
+                if (this.elements.video.paused) {
+                    this.elements.video.play();
+                } else {
+                    this.elements.video.pause();
+                }
+            }
+            
+            seekVideo(e) {
+                const rect = this.elements.progressBar.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                this.elements.video.currentTime = percent * this.elements.video.duration;
+            }
+            
+            toggleMute() {
+                this.elements.video.muted = !this.elements.video.muted;
+                this.updateVolumeIcon();
+            }
+            
+            setVolume(e) {
+                const rect = this.elements.volumeSlider.getBoundingClientRect();
+                let percent = (e.clientX - rect.left) / rect.width;
+                percent = Math.max(0, Math.min(1, percent));
+                this.elements.video.volume = percent;
+                this.updateVolumeIcon();
+            }
+            
+            updateVolumeIcon() {
+                if (this.elements.video.muted || this.elements.video.volume === 0) {
+                    this.elements.volumeBtn.textContent = '🔇';
+                } else if (this.elements.video.volume < 0.5) {
+                    this.elements.volumeBtn.textContent = '🔈';
+                } else {
+                    this.elements.volumeBtn.textContent = '🔊';
+                }
+            }
+            
+            updateDuration() {
+                this.updateProgress();
+            }
+            
+            updateProgress() {
+                const video = this.elements.video;
+                const percent = (video.currentTime / video.duration) * 100;
+                this.elements.progressFilled.style.width = percent + '%';
+                
+                const currentTime = this.formatTime(video.currentTime);
+                const duration = this.formatTime(video.duration);
+                this.elements.timeDisplay.textContent = `${currentTime} / ${duration}`;
+                
+                // 更新音量条
+                this.elements.volumeFilled.style.width = (video.volume * 100) + '%';
+            }
+            
+            formatTime(seconds) {
+                if (isNaN(seconds)) return '00:00';
+                
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            onPlay() {
+                this.elements.playPauseBtn.textContent = '⏸️';
+                this.sendWebSocketMessage('PLAYBACK_STARTED');
+                this.hideLoading();
+                this.hideError();
+            }
+            
+            onPause() {
+                this.elements.playPauseBtn.textContent = '▶️';
+                console.log('视频暂停');
+            }
+            
+            onEnded() {
+                console.log('视频播放结束');
+                this.sendWebSocketMessage('PLAYBACK_FINISHED');
+            }
+            
+            onError(e) {
+                console.error('播放器错误:', e);
+                this.showError('视频播放失败');
+            }
+            
+            showControls() {
+                this.elements.playerControls.classList.add('visible');
+            }
+            
+            hideControls() {
+                this.elements.playerControls.classList.remove('visible');
+            }
+            
+            showLoading(text = '正在加载...') {
+                this.elements.loading.querySelector('.loading-overlay__text').textContent = text;
+                this.elements.loading.classList.remove('hidden');
+            }
+            
+            hideLoading() {
+                this.elements.loading.classList.add('hidden');
+            }
+            
+            showError(message) {
+                this.elements.errorMessage.textContent = message;
+                this.elements.error.classList.remove('hidden');
+                this.hideLoading();
+            }
+            
+            hideError() {
+                this.elements.error.classList.add('hidden');
+            }
+            
+            sendWebSocketMessage(message) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(message);
+                }
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            new VideoPlayer();
+        });
+    </script>
+</body>
+</html>

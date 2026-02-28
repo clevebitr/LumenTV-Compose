@@ -7,9 +7,6 @@ import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -17,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 private val log = LoggerFactory.getLogger("WebPlayerServer")
 
 object WebPlayerServer {
-    private var server: EmbeddedServer<*, *>? = null // 使用泛型通配符
+    private var server: EmbeddedServer<*, *>? = null
     private val isRunning = AtomicBoolean(false)
     private val portCounter = AtomicInteger(9000)
     private var currentPort = 0
@@ -37,7 +34,15 @@ object WebPlayerServer {
             return currentPort
         }
 
-        val port = if (preferredPort > 0) preferredPort else portCounter.getAndIncrement()
+        val port = if (preferredPort > 0) preferredPort else {
+            // 检查端口是否可用，如果不可用则递增
+            var testPort = portCounter.get()
+            while (!isPortAvailable(testPort) && testPort < 9100) {
+                testPort++
+            }
+            portCounter.set(testPort)
+            portCounter.getAndIncrement()
+        }
 
         try {
             server = embeddedServer(Netty, port = port) {
@@ -61,133 +66,19 @@ object WebPlayerServer {
                             episodeNumber = call.parameters["episode"]?.toIntOrNull()
                         )
 
-                        // 使用HTML流生成器替代respondHtml
-                        val htmlContent = buildString {
-                            append("""
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                    <title>$title</title>
-                                    <meta charset="UTF-8">
-                                    <style>
-                                        body {
-                                            margin: 0;
-                                            padding: 0;
-                                            background: #000;
-                                            font-family: Arial, sans-serif;
-                                        }
-                                        #player-container {
-                                            width: 100vw;
-                                            height: 100vh;
-                                            display: flex;
-                                            justify-content: center;
-                                            align-items: center;
-                                        }
-                                        #player {
-                                            width: 100%;
-                                            height: 100%;
-                                            max-width: 100%;
-                                            max-height: 100%;
-                                        }
-                                        .video-title {
-                                            position: absolute;
-                                            top: 20px;
-                                            left: 20px;
-                                            color: white;
-                                            background: rgba(0,0,0,0.7);
-                                            padding: 10px 15px;
-                                            border-radius: 5px;
-                                            font-size: 18px;
-                                            z-index: 1000;
-                                        }
-                                    </style>
-                                </head>
-                                <body>
-                                    <div class="video-title">$title</div>
-                                    <div id="player-container">
-                                        <video id="player" controls autoplay>
-                                            <source src="$mediaUrl" type="${when {
-                                mediaUrl.endsWith(".m3u8", ignoreCase = true) -> "application/x-mpegURL"
-                                mediaUrl.endsWith(".mp4", ignoreCase = true) -> "video/mp4"
-                                else -> "video/mp4"
-                            }}">
-                                        </video>
-                                    </div>
-                                    <script>
-                                        let ws = null;
-                                        let retryCount = 0;
-                                        const maxRetries = 5;
+                        // 使用外部HTML模板
+                        val templateContent = this::class.java.classLoader
+                            .getResourceAsStream("web_player_template.html")
+                            ?.bufferedReader()
+                            ?.readText()
+                            ?: throw IllegalStateException("找不到web_player_template.html模板文件")
 
-                                        function connectWebSocket() {
-                                            if (retryCount >= maxRetries) {
-                                                console.error('WebSocket连接失败，达到最大重试次数');
-                                                return;
-                                            }
-
-                                            try {
-                                                ws = new WebSocket('ws://localhost:8888');
-
-                                                ws.onopen = function(event) {
-                                                    console.log('WebSocket连接已建立');
-                                                    retryCount = 0;
-                                                };
-
-                                                ws.onclose = function(event) {
-                                                    console.log('WebSocket连接已关闭');
-                                                    // 尝试重连
-                                                    setTimeout(() => {
-                                                        retryCount++;
-                                                        connectWebSocket();
-                                                    }, 2000);
-                                                };
-
-                                                ws.onerror = function(error) {
-                                                    console.error('WebSocket错误:', error);
-                                                };
-                                            } catch (error) {
-                                                console.error('WebSocket连接异常:', error);
-                                                setTimeout(() => {
-                                                    retryCount++;
-                                                    connectWebSocket();
-                                                }, 2000);
-                                            }
-                                        }
-
-                                        // 初始化WebSocket连接
-                                        connectWebSocket();
-
-                                        const video = document.getElementById('player');
-
-                                        video.addEventListener('play', function() {
-                                            if (ws && ws.readyState === WebSocket.OPEN) {
-                                                ws.send('PLAYBACK_STARTED');
-                                            }
-                                        });
-
-                                        video.addEventListener('ended', function() {
-                                            if (ws && ws.readyState === WebSocket.OPEN) {
-                                                ws.send('PLAYBACK_FINISHED');
-                                            }
-                                        });
-
-                                        video.addEventListener('error', function(e) {
-                                            console.error('视频播放错误:', e);
-                                        });
-
-                                        // 页面卸载时关闭WebSocket
-                                        window.addEventListener('beforeunload', function() {
-                                            if (ws) {
-                                                ws.close();
-                                            }
-                                        });
-                                    </script>
-                                </body>
-                                </html>
-                            """.trimIndent())
-                        }
+                        // 替换模板中的占位符
+                        val htmlContent = templateContent
+                            .replace("{{title}}", title)
+                            .replace("{{mediaUrl}}", mediaUrl)
 
                         call.respondText(htmlContent, ContentType.Text.Html)
-
                     }
 
                     // 健康检查端点
@@ -231,7 +122,10 @@ object WebPlayerServer {
                 server?.stop(1000, 5000)
                 server = null
                 currentMediaInfo = null
-                log.info("Web播放器服务器已停止")
+                // 重置端口计数器
+                portCounter.set(9000)
+                currentPort = 0
+                log.info("Web播放器服务器已停止，端口计数器已重置")
             } catch (e: Exception) {
                 log.error("停止Web播放器服务器时出错", e)
             }
@@ -278,4 +172,15 @@ object WebPlayerServer {
 // 扩展函数用于URL编码
 private fun String.encodeURLParameter(): String {
     return java.net.URLEncoder.encode(this, "UTF-8")
+}
+
+// 检查端口是否可用
+private fun isPortAvailable(port: Int): Boolean {
+    return try {
+        val socket = java.net.ServerSocket(port)
+        socket.close()
+        true
+    } catch (e: Exception) {
+        false
+    }
 }

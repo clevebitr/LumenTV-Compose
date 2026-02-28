@@ -27,34 +27,33 @@ private val _webPlaybackFinishedFlow = MutableSharedFlow<Unit>(
 )
 val webPlaybackFinishedFlow: SharedFlow<Unit> = _webPlaybackFinishedFlow
 
-// 新增标志位，记录当前视频是否正在播放
-private var isVideoPlaying = false
 
 object BrowserUtils {
 
-    // 定义 WebSocket 连接状态流
+    // WebSocket 连接状态流
     val _webSocketConnectionState = MutableStateFlow(false) // 初始状态为未连接
     val webSocketConnectionState: StateFlow<Boolean> = _webSocketConnectionState
     private val lastOpenTime = AtomicLong(0)
 
-    // 定义一个 CoroutineScope 实例
+    // CoroutineScope 实例
     val scope = CoroutineScope(Dispatchers.Default)
-    
+
     // 使用可空类型而不是lateinit，避免未初始化异常
     var detailViewModel: DetailViewModel? = null
 
-    // 添加初始化方法
+    // 初始化
     fun initialize(viewModel: DetailViewModel) {
         detailViewModel = viewModel
         log.info("BrowserUtils 已初始化 detailViewModel")
     }
 
     // 启动 WebSocket 服务器
-    private val isWebSocketServerStarted = AtomicBoolean(false)
-
     fun startWebSocketServer() {
-        if (isWebSocketServerStarted.compareAndSet(false, true)) {
+        if (!VideoEventServer.isRunning()) {
             VideoEventServer.start()
+            log.info("WebSocket服务器启动中")
+        } else {
+            log.info("WebSocket服务器已在运行中")
         }
     }
 
@@ -80,7 +79,6 @@ object BrowserUtils {
         }
     }
 
-
     // 模拟切换到下一个选集并播放的方法
     fun switchToNextEpisodeAndPlay() {
         val viewModel = detailViewModel
@@ -88,7 +86,7 @@ object BrowserUtils {
             log.warn("detailViewModel未初始化，无法切换下一集")
             return
         }
-        
+
         scope.launch {
             try {
                 val nextEpisodeUrl = viewModel.getNextEpisodeUrl()
@@ -129,7 +127,6 @@ object BrowserUtils {
         override fun currentTimeMillis(): Long = System.currentTimeMillis()
     }
 
-
     /**
      * 使用WebPlayerServer在浏览器中播放视频
      * 该方法会启动WebPlayerServer并在浏览器中打开播放页面
@@ -156,7 +153,7 @@ object BrowserUtils {
             startWebSocketServer()
             // 启动监听，当接收到视频播放完成事件时处理下一集
             startListening()
-            
+
             try {
                 // 使用WebPlayerServer打开浏览器
                 val title = if (episodeNumber != null && episodeNumber != -1) {
@@ -164,13 +161,13 @@ object BrowserUtils {
                 } else {
                     episodeName ?: "视频播放"
                 }
-                
+
                 WebPlayerServer.openInBrowser(
                     mediaUrl = videoUrl,
                     title = title,
                     episodeNumber = episodeNumber
                 )
-                
+
                 log.info("使用WebPlayerServer在浏览器中打开视频: $title")
             } catch (e: Exception) {
                 log.error("使用WebPlayerServer打开浏览器失败", e)
@@ -179,64 +176,70 @@ object BrowserUtils {
         }
     }
 
+    /**
+     * 清理BrowserUtils实例，包括停止WebSocket服务器和清空detailViewModel引用
+     */
     fun cleanup() {
-        // 检查WebSocket服务器是否正在运行
-        if (VideoEventServer.isRunning()) {
-            VideoEventServer.stop()
-            log.info("WebSocket 服务器已停止")
-        } else {
-            log.info("WebSocket 服务器未运行，跳过停止操作")
-        }
-        
         // 停止WebPlayerServer
         if (WebPlayerServer.isServerRunning()) {
             WebPlayerServer.stop()
             log.info("WebPlayerServer已停止")
         }
-        
+
         // 清空detailViewModel引用
         detailViewModel = null
+    }
+
+    /**
+     * 停止BrowserUtils WebSocket服务器
+     */
+    fun cleanupWebSocketServer() {
+        if (VideoEventServer.isRunning()) {
+            VideoEventServer.stop()
+        }
     }
 }
 
 // WebSocket 服务器实现
-object VideoEventServer : WebSocketServer(InetSocketAddress("localhost", 8888)) {
+object VideoEventServer : WebSocketServer(InetSocketAddress("127.0.0.1", 8888)) {
     // 添加状态标记
-    private var _isRunning = AtomicBoolean(false)
+    private val _isRunning = AtomicBoolean(false)
 
     // 提供公共方法检查运行状态
     fun isRunning(): Boolean = _isRunning.get()
 
+    /**
+     * 监听WebSocket连接打开事件
+     */
     override fun onOpen(conn: WebSocket?, handshake: ClientHandshake?) {
         log.debug("WebSocket 连接已建立")
-        // 连接建立后，重置播放状态
-        isVideoPlaying = false
         // 连接建立后，更新 WebSocket 连接状态为已连接
         BrowserUtils._webSocketConnectionState.value = true
     }
 
+    /**
+     * 监听WebSocket连接关闭事件
+     */
     override fun onClose(conn: WebSocket?, code: Int, reason: String?, remote: Boolean) {
         log.debug("WebSocket 连接关闭，关闭码: {}, 关闭原因: {}, 是否远程关闭: {}", code, reason, remote)
         // 若视频正在播放，说明是中途退出，更新 WebSocket 连接状态为未连接
-        if (isVideoPlaying) {
-            BrowserUtils._webSocketConnectionState.value = false
-            log.debug("更新WebSocket 连接状态：{}", BrowserUtils._webSocketConnectionState.value)
-        }
+        BrowserUtils._webSocketConnectionState.value = false
+        log.debug("更新WebSocket 连接状态：{}", BrowserUtils._webSocketConnectionState.value)
     }
 
+    /**
+     * 接收来自浏览器的消息-反射
+     * */
     override fun onMessage(conn: WebSocket?, message: String?) {
         log.info("收到消息: {}", message)
         // 在这里处理来自浏览器的消息（如播放开始、播放完成事件）
         when (message) {
             "PLAYBACK_STARTED" -> {
                 log.info("视频播放开始！")
-                // 设置视频正在播放标志
-                isVideoPlaying = true
             }
+
             "PLAYBACK_FINISHED" -> {
                 log.info("视频播放完成！")
-                // 重置视频正在播放标志
-                isVideoPlaying = false
                 // 使用自定义的 CoroutineScope 实例启动协程
                 BrowserUtils.scope.launch {
                     _webPlaybackFinishedFlow.emit(Unit)
@@ -246,19 +249,32 @@ object VideoEventServer : WebSocketServer(InetSocketAddress("localhost", 8888)) 
         }
     }
 
+    /**
+     * WebSocket错误反射
+     * */
     override fun onError(conn: WebSocket?, ex: Exception?) {
         log.error("WebSocket 发生错误", ex)
+        // 添加更详细的错误信息
+        ex?.let {
+            log.error("WebSocket错误详情: {}", it.message)
+            it.printStackTrace()
+        }
     }
 
-    // 重写 onStart 方法
+    /**
+     * 启动WebSocket服务器反射
+     * */
     override fun onStart() {
         _isRunning.set(true)
-        log.info("WebSocket 服务器已启动")
+        log.info("WebSocket 服务器已启动，监听地址: {}:{}", address.hostString, address.port)
     }
 
-    // 重写 stop 方法
+    /**
+     * 全局停止WebSocket服务器
+     * */
     override fun stop() {
         super.stop()
         _isRunning.set(false)
+        log.info("WebSocket 服务器已停止")
     }
 }

@@ -99,13 +99,14 @@ fun PngFoundDialog(
                                 // 从 viewModel 的状态中获取当前选中的剧集 URL
                                 val currentSelectedEpNumber = vm.currentSelectedEpNumber
                                 // 从状态数据里找到对应的剧集
-                                val currentEpisode = vm.state.value.detail.subEpisode.find { it.number == currentSelectedEpNumber }
+                                val currentEpisode =
+                                    vm.state.value.detail.subEpisode.find { it.number == currentSelectedEpNumber }
                                 val episodeName = vm.state.value.detail.vodName ?: ""
                                 val episodeNumber = currentEpisode?.number ?: 0
                                 // 记录用户选择在浏览器打开
                                 DialogState.userChoseOpenInBrowser = true
-                                pngLog.debug("Name is {},Number is {}",episodeName,episodeNumber)
-                                BrowserUtils.openBrowserWithWebPlayer(m3u8Url,episodeName,episodeNumber)
+                                pngLog.debug("Name is {},Number is {}", episodeName, episodeNumber)
+                                BrowserUtils.openBrowserWithWebPlayer(m3u8Url, episodeName, episodeNumber)
                                 onDismiss()
                             },
                             modifier = Modifier.weight(1f),

@@ -10,24 +10,42 @@ class VlcJInit {
     companion object {
         private val log = thisLogger()
         private var controller: VlcjFrameController? = null
-        @Volatile private var isReleased = false
+        @Volatile
+        private var isReleased = false
 
+        /**
+         * 获取Vlcj内置播放器
+         * */
         fun getController(): VlcjFrameController? {
             return controller
         }
+
+        /**
+         * 设置Vlcj内置播放器
+         * */
         fun setController(controller: VlcjFrameController) {
             this.controller = controller
             isReleased = false
         }
 
+
+        /**
+         * 初始化vlcj内置播放器
+         * */
         fun init(notify: Boolean = false) {
             val discover = NativeDiscovery().discover()
             if (!discover && SettingStore.getPlayerSetting()[0] as Boolean) {
-                SnackBar.postMsg("未找到VLC播放器组件，请安装VLC或者配置vlc可执行文件位置", type = SnackBar.MessageType.ERROR)
+                SnackBar.postMsg(
+                    "未找到VLC播放器组件，请安装VLC或者配置vlc可执行文件位置",
+                    type = SnackBar.MessageType.ERROR
+                )
             }
             if (notify) SnackBar.postMsg("VLC加载${if (discover) "成功" else "失败"}", type = SnackBar.MessageType.INFO)
         }
 
+        /**
+         * 释放vlcj内置播放器
+         * */
         fun release() {
             if (isReleased) {
                 log.debug("VLC已全局释放，跳过当前操作")

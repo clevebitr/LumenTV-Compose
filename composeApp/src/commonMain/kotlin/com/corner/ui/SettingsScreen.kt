@@ -635,6 +635,8 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                             ?.value?.getPlayerSetting()?.toMutableList()
                             ?: mutableListOf(PlayerType.Innie.id, "")
 
+                        log.info("playerSetting: $arr")
+
                         if (listOf("true", "false").contains(arr[0])) {
                             if (arr[0].toBoolean()) {
                                 arr[0] = PlayerType.Innie.id
@@ -726,7 +728,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                             maxLines = 1,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            enabled = playerSetting.value.first() != PlayerType.Innie.id,
+                            enabled = playerSetting.value.first() == PlayerType.Outie.id,
                             isError = !isPathValid || showPathWarning,
                             supportingText = {
                                 if (!isPathValid || showPathWarning) {
@@ -739,7 +741,7 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                             }
                         )
 
-                        // 添加一个按钮用于验证路径
+                        // 验证路径
                         if (playerSetting.value.first() == PlayerType.Outie.id) {
                             Button(
                                 onClick = {

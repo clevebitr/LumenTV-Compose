@@ -13,12 +13,18 @@ private val log = LoggerFactory.getLogger("KtorD")
 
 object KtorD {
 
+    /**
+     * KtorD服务器端口
+     */
     var ports: Int = -1
 
+    /**
+     * KtorD服务器
+     */
     var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
     /**
-     * https://ktor.io/docs/configuration-file.html#predefined-properties
+     * KtorD服务器初始化
      */
     suspend fun init() {
         log.info("KtorD Init")
@@ -49,30 +55,34 @@ object KtorD {
         log.info("KtorD init end port:{}", server!!.application.engine.resolvedConnectors().first().port)
     }
 
+    /**
+     * 停止 KtorD  服务器
+     */
     fun stop() {
         log.info("KtorD stop")
         server?.stop()
     }
 }
 
+/**
+ * KtorD 模块
+ */
 private fun Application.module() {
-//    install(CallLogging){
-//        level = Level.DEBUG
-//    }
-//    install(ContentNegotiation){
-//        json(Json {
-//            isLenient = true
-//            prettyPrint = true
-//        })
-//    }
+    // 跨域
     install(CORS) {
         allowMethod(HttpMethod.Options)
-        allowMethod(HttpMethod.Put)
-        allowMethod(HttpMethod.Delete)
-        allowMethod(HttpMethod.Patch)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
         allowHeader(HttpHeaders.Authorization)
-        allowHeader("MyCustomHeader")
-        anyHost() // @TODO: Don't do this in production if possible. Try to limit it.
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Accept)
+        allowHeader(HttpHeaders.Range)
+        allowHeader("X-Requested-With")
+        allowNonSimpleContentTypes = true
+        anyHost() // 允许所有主机访问（开发环境）
+        allowCredentials = false // 设置为false避免与具体Origin冲突
     }
+
+    // 路由
     configureRouting()
 }

@@ -33,9 +33,20 @@ private val log = LoggerFactory.getLogger("Init")
 
 class Init {
     companion object {
+        /**
+         * 初始化成功状态
+         * */
         private val _isInitializedSuccessfully = mutableStateOf(false)
         val isInitializedSuccessfully: State<Boolean> = _isInitializedSuccessfully
+
+        /**
+         * Koin实例
+         * */
         private var instance: KoinApplication? = null
+
+        /**
+         * 初始化应用
+         * */
         suspend fun start() {
             showProgress()
             try {
@@ -60,12 +71,15 @@ class Init {
             }
         }
 
+        /**
+         * 关闭应用服务
+         * */
         fun stop() {
             GlobalAppState.cancelAllOperations("Application shutdown")// stop CoroutineScope
             try {
                 VlcJInit.release()      //release VlcJ
                 resetAllStates()        //reset all states
-                BrowserUtils.cleanup()  //stop webSocket
+                BrowserUtils.cleanupWebSocketServer()  //stop webSocket
                 KtorD.stop()            //stop KtorD
                 stopKoin()              //stop Koin
                 stopDLNA()              //stop DLNA
@@ -75,18 +89,27 @@ class Init {
             }
         }
 
+        /**
+         * 初始化Koin注入框架（Database）
+         * */
         private fun initKoin() {
             instance = startKoin {
                 modules(appModule)
             }
         }
 
+        /**
+         * 停止Koin注入框架（Database）
+         * */
         private fun stopKoin() {
             log.info("Stop Koin")
             instance?.close()
             instance = null
         }
 
+        /**
+         * 初始化DLNA功能
+         * */
         private fun initDLNA() {
             GlobalAppState.upnpService = TVMUpnpService().apply {
                 startup()
@@ -94,12 +117,18 @@ class Init {
             }
         }
 
+        /**
+         * 停止DLNA服务
+         * */
         private fun stopDLNA() {
             log.info("Stop DLNA Service")
             GlobalAppState.upnpService?.shutdown()
             GlobalAppState.upnpService = null
         }
 
+        /**
+         * 初始化点播源配置
+         * */
         fun initConfig(forceReinit: Boolean = false) {
             if (!forceReinit && _isInitializedSuccessfully.value) {
                 log.warn("配置已初始化，跳过重复操作")
@@ -165,4 +194,7 @@ class Init {
     }
 }
 
+/**
+ * 平台特定的初始化
+ */
 expect fun initPlatformSpecify()
