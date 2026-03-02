@@ -1583,8 +1583,8 @@ class DetailViewModel : BaseViewModel() {
      * 更新状态流中的当前 URL 和当前播放 URL 信息。
      * 若传入的播放 URL 字符串为 null，则使用空字符串作为当前播放 URL。
      *
-     * @param i 可选的 URL 对象，用于更新状态流中的当前 URL。
-     * @param v 可选的播放 URL 字符串，用于更新状态流中的当前播放 URL。若为 null，则使用空字符串。
+     * @param url 可选的 URL 对象，用于更新状态流中的当前 URL。
+     * @param playUrl 可选的播放 URL 字符串，用于更新状态流中的当前播放 URL。若为 null，则使用空字符串。
      */
     fun chooseLevel(url: Url?, playUrl: String?) {
         _state.update { it.copy(isLoading = true, isBuffering = false) }
