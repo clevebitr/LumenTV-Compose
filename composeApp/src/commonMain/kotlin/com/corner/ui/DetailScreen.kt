@@ -53,6 +53,7 @@ import com.corner.bean.getPlayerSetting
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Vod.Companion.isEmpty
 import com.corner.catvodcore.bean.Episode
+import com.corner.catvodcore.bean.Url
 import com.corner.catvodcore.util.Utils
 import com.corner.catvodcore.viewmodel.GlobalAppState
 import com.corner.catvodcore.viewmodel.GlobalAppState.hideProgress
@@ -99,6 +100,8 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
     val isFullScreen = GlobalAppState.videoFullScreen.collectAsState()
     val videoHeight = derivedStateOf { if (isFullScreen.value) 1f else 0.6f }
     val videoWidth = derivedStateOf { if (isFullScreen.value) 1f else 0.7f }
+    val urls = rememberUpdatedState(vm.state.value.currentUrl)
+    val showUrl = derivedStateOf { (urls.value?.values?.size ?: 0) > 1 }
 
     //监听isLoading, 显示加载动画
     LaunchedEffect(model.isLoading) {
@@ -239,7 +242,8 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
             }
 
             TopNotification(
-                show = showWebSocketDisconnected,
+                show = showWebSocketDisconnected && vm.vmPlayerType.first() == PlayerType.Web.id
+                        || showWebSocketDisconnected && openDialogState,
                 vm = vm,
                 scope = scope,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
@@ -250,7 +254,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                     .padding(start = if (isFullScreen.value) 0.dp else 16.dp),//全屏取消左侧缩进
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                if (localShowPngDialog && !DialogState.userChoseOpenInBrowser) {
+                if (localShowPngDialog /*&& !DialogState.userChoseOpenInBrowser*/) {
                     PngFoundDialog(
                         m3u8Url = localCurrentM3U8Url,
                         text = "在当前播放的m3u8文件中，检测到了特殊链接，是否跳转到浏览器播放？",
@@ -400,78 +404,8 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                                         .fillMaxHeight(),
                                     verticalArrangement = Arrangement.spacedBy(24.dp)
                                 ) {
-                                    // 清晰度选择
-                                    val urls = rememberUpdatedState(vm.state.value.currentUrl)
-                                    val showUrl = derivedStateOf { (urls.value?.values?.size ?: 0) > 1 }
-                                    if (showUrl.value) {
-                                        Column(
-                                            modifier = Modifier
-                                                .padding(vertical = 12.dp)
-                                                .fillMaxWidth()
-                                        ) {
-                                            // 标题文本
-                                            Text(
-                                                text = "画质选择",
-                                                style = MaterialTheme.typography.titleLarge.copy(
-                                                    fontWeight = FontWeight.Medium
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
-                                            )
-
-                                            // 清晰度选项列表
-                                            LazyRow(
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                itemsIndexed(urls.value?.values ?: listOf()) { i, item ->
-                                                    val isSelected = i == urls.value?.position!!
-
-                                                    Surface(
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        color = if (isSelected)
-                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                                        else
-                                                            MaterialTheme.colorScheme.surfaceVariant,
-                                                        border = BorderStroke(
-                                                            width = if (isSelected) 1.5.dp else 1.dp,
-                                                            color = if (isSelected)
-                                                                MaterialTheme.colorScheme.primary
-                                                            else
-                                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                                                        ),
-                                                        onClick = {
-                                                            vm.chooseLevel(
-                                                                urls.value?.copy(position = i),
-                                                                item.v
-                                                            )
-                                                        },
-                                                        modifier = Modifier
-                                                            .height(40.dp)
-                                                            .widthIn(min = 80.dp)
-                                                    ) {
-                                                        Box(
-                                                            contentAlignment = Alignment.Center,
-                                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = item.n ?: "选项 ${i + 1}",
-                                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                                ),
-                                                                color = if (isSelected)
-                                                                    MaterialTheme.colorScheme.primary
-                                                                else
-                                                                    MaterialTheme.colorScheme.onSurface,
-                                                                maxLines = 1
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                    // 分辨率选择
+                                    Levels(vm,urls,showUrl)
                                     // 线路选择
                                     Flags(vm)
                                     // 底部留白
@@ -526,6 +460,84 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                             vm,
                             Modifier.fillMaxSize()
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun Levels(
+    vm: DetailViewModel,
+    urls: State<Url?>,
+    showUrl: State<Boolean>,
+) {
+    if (showUrl.value) {
+        Column(
+            modifier = Modifier
+                .padding(vertical = 12.dp)
+                .fillMaxWidth()
+        ) {
+            // 标题文本
+            Text(
+                text = "画质选择",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
+            )
+
+            // 清晰度选项列表
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                itemsIndexed(urls.value?.values ?: listOf()) { i, item ->
+                    val isSelected = i == urls.value?.position!!
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        ),
+                        onClick = {
+                            vm.chooseLevel(
+                                urls.value?.copy(position = i),
+                                item.v
+                            )
+                        },
+                        modifier = Modifier
+                            .height(40.dp)
+                            .widthIn(min = 80.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            Text(
+                                text = item.n ?: "选项 ${i + 1}",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                color = if (isSelected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }

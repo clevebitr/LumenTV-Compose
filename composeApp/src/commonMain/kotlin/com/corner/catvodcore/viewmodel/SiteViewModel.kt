@@ -260,6 +260,8 @@ object SiteViewModel {
             }
             _state.update { it.copy(isSpecialVideoLink = true) }
             return // 特殊链接无需后续M3U8处理
+        }else{
+            log.debug("未发现特殊链接:{}", urlStr)
         }
 
         // 2. 处理「标准M3U8链接」（以.m3u8结尾、不含proxy）

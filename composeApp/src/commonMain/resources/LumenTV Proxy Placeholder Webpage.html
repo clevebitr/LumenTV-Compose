@@ -1,35 +1,369 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LumenTV Proxy</title>
+    <title>LumenTV Proxy API</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        * {
             margin: 0;
-            background-color: #f4f4f9;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
         }
         .container {
-            text-align: center;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
         }
-        h1 {
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section h2 {
             color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        .api-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .api-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+        .api-card h3 {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .api-card h3::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .method.get { background: #e8f5e9; color: #2e7d32; }
+        .method.post { background: #fff3e0; color: #ef6c00; }
+        .method.options { background: #eceff1; color: #546e7a; }
+        .url {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 4px 10px;
+            border-radius: 4px;
+            color: #333;
+        }
+        .description {
+            color: #666;
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+        .params {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .params h4 {
+            color: #333;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .param-item {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .param-item:last-child {
+            border-bottom: none;
+        }
+        .param-name {
+            font-family: 'Courier New', monospace;
+            color: #667eea;
+            width: 120px;
+            font-weight: bold;
+        }
+        .param-type {
+            color: #888;
+            margin-right: 10px;
+        }
+        .param-desc {
+            color: #666;
+        }
+        .example {
+            background: #2d3748;
+            color: #f7fafc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .example h4 {
+            color: #a0aec0;
+            margin-bottom: 10px;
+        }
+        .example code {
+            display: block;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .note {
+            background: #fffaf0;
+            border-left: 4px solid #ed8936;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .note h4 {
+            color: #dd6b20;
+            margin-bottom: 8px;
+        }
+        .note p {
+            color: #744210;
+            line-height: 1.6;
+        }
+        .footer {
+            background: #f7fafc;
+            padding: 30px;
+            text-align: center;
+            color: #718096;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer p {
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Welcome to LumenTV Proxy</h1>
-        <p>This is a placeholder webpage for LumenTV.</p>
+        <div class="header">
+            <h1>🎬 LumenTV Proxy API</h1>
+            <p>视频代理服务接口文档</p>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2>📋 API 接口列表</h2>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">/proxy</span></h3>
+                    <p class="description">视频内容代理服务，支持范围请求（Range），用于播放器直接访问视频源</p>
+                    
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">url</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">视频源URL（必填）</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-name">headers</span>
+                            <span class="param-type">object</span>
+                            <span class="param-desc">自定义请求头（可选）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /proxy?url=https://example.com/video.mp4</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">/proxy/m3u8</span></h3>
+                    <p class="description">代理 m3u8 文件，用于 HLS 流媒体播放</p>
+                    
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">url</span>
+                            <span class="param-type">string (URL编码)</span>
+                            <span class="param-desc">m3u8文件URL（必填）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /proxy/m3u8?url=https%3A%2F%2Fexample.com%2Findex.m3u8</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">/proxy/cached_m3u8</span></h3>
+                    <p class="description">代理已缓存的 m3u8 文件，通过缓存ID获取</p>
+                    
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">id</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">缓存ID（必填）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /proxy/cached_m3u8?id=abc123</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">/video/proxy</span></h3>
+                    <p class="description">Web播放器专用视频代理，支持完整的CORS和视频流处理</p>
+                    
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">url</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">视频源URL（必填）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /video/proxy?url=https://example.com/video.mp4</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">127.0.0.1:9000/player</span></h3>
+                    <p class="description">Web播放器页面，提供完整的视频播放界面</p>
+                    <p class="description">注意，需要lumenTV启动播放服务</p>
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">url</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">视频URL（必填）</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-name">title</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">视频标题（可选）</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-name">episode</span>
+                            <span class="param-type">number</span>
+                            <span class="param-desc">集数（可选）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /player?url=https://example.com/video.mp4&title=视频标题&episode=1</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">/postMsg</span></h3>
+                    <p class="description">向应用发送弹窗消息</p>
+                    
+                    <div class="params">
+                        <h4>请求参数</h4>
+                        <div class="param-item">
+                            <span class="param-name">msg</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">消息内容（必填）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>请求示例</h4>
+                        <code>GET /postMsg?msg=操作成功</code>
+                    </div>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method options">OPTIONS</span> <span class="url">/video/proxy</span></h3>
+                    <p class="description">CORS预检请求，用于跨域视频代理</p>
+                </div>
+                
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">127.0.0.1:9000/health</span></h3>
+                    <p class="description">健康检查端点</p>
+                    <p class="description">注意，需要lumenTV启动播放服务</p>
+                    <div class="example">
+                        <h4>响应示例</h4>
+                        <code>OK</code>
+                    </div>
+                </div>
+
+                <div class="api-card">
+                    <h3><span class="method get">GET</span> <span class="url">127.0.0.1:9000/info</span></h3>
+                    <p class="description">网页播放器播放的视频信息</p>
+                    <p class="description">注意，需要lumenTV启动播放服务</p>
+                    <div class="example">
+                        <h4>响应示例</h4>
+                        <code>
+ {
+     "title": "第01集 第 1 集",
+     "url": "https://pans22.s4-tximg.top/pans2/%E7%8E%AB%E7%91%B0%E4%B8%9B%E7%94%9F_01.mp4",
+     "episode": 1
+ }
+                        </code>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="note">
+                <h4>💡 使用说明</h4>
+                <p>1. 所有代理接口都支持 Range 请求，确保播放器可以正常拖动进度条</p>
+                <p>2. 视频代理会自动处理 CORS 和 Referer 头</p>
+                <p>3. m3u8 代理会自动解码 URL 参数</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 LumenTV Proxy Service</p>
+            <p>Version 1.0.0</p>
+        </div>
     </div>
 </body>
 </html>

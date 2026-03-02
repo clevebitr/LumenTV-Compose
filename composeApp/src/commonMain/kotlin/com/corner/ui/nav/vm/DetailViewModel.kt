@@ -840,13 +840,9 @@ class DetailViewModel : BaseViewModel() {
         // 将当前剧集标记为激活状态，更新UI显示
         updateEpisodeActivation(ep)
 
-        //获取播放器设置
-        val playerType =
-            SettingStore.getSettingItem(SettingType.PLAYER.id).getPlayerSetting(detail.site?.playerType)
-
-        log.debug("播放器类型: {}", playerType)
+        log.debug("播放器类型: {}", vmPlayerType)
         // 根据播放器类型执行不同的播放操作
-        when (playerType.first()) {
+        when (vmPlayerType.first()) {
             PlayerType.Innie.id -> {
                 scope.launch {
                     lifecycleManager.transitionTo(Loading) {
@@ -869,7 +865,7 @@ class DetailViewModel : BaseViewModel() {
                 scope.launch {
                     SnackBar.postMsg("即将播放" + ": ${ep.name}", type = SnackBar.MessageType.INFO)
                     _state.update { it.copy(isBuffering = false) }
-                    openBrowserWithWebPlayer(result.url.v(), ep.name,ep.number)
+                    openBrowserWithWebPlayer(result.url.v(), ep.name, ep.number)
                 }
             }
         }
@@ -1374,29 +1370,33 @@ class DetailViewModel : BaseViewModel() {
     fun syncHistory() {
         // 获取当前视频详情信息
         val detail = _state.value.detail
-        log.debug("开始同步历史记录，视频ID: {}, 站点: {}", detail.vodId, detail.site?.key)
+        log.debug("[历史记录同步]开始同步历史记录，视频ID: {}, 站点: {}", detail.vodId, detail.site?.key)
 
         // 在协程作用域中启动一个协程来处理历史记录同步操作
         scope.launch {
             // 根据当前视频的站点 key 和视频 ID 从数据库中查找历史记录
             var history = Db.History.findHistory(Utils.getHistoryKey(detail.site?.key!!, detail.vodId))
-            log.debug("数据库查询历史记录结果: {}", if (history == null) "未找到" else "找到记录")
+            log.debug("[历史记录同步]数据库查询历史记录结果: {}", if (history == null) "未找到" else "找到记录")
 
             // 若历史记录不存在
             if (history == null) {
                 // 使用当前视频详情信息创建新的历史记录
-                log.debug("未找到历史记录，创建新的历史记录")
+                log.debug("[历史记录同步]未找到历史记录，创建新的历史记录")
                 val newHistory =
                     Db.History.create(detail, detail.currentFlag.flag!!, detail.getEpisode()?.name ?: detail.vodName!!)
-                log.debug("新历史记录创建完成: {}", newHistory)
+                log.debug("[历史记录同步]新历史记录创建完成: {}", newHistory)
             } else {
                 // 若当前选中剧集名称与历史记录中的剧集名称不同，且历史记录中有播放位置
-                log.debug("现有历史记录: vodRemarks={}, position={}", history.vodRemarks, history.position)
-                log.debug("当前选中剧集: {}", _state.value.currentEp?.name)
+                log.debug(
+                    "[历史记录同步]现有历史记录: vodRemarks={}, position={}",
+                    history.vodRemarks,
+                    history.position
+                )
+                log.debug("[历史记录同步]当前选中剧集: {}", _state.value.currentEp?.name)
 
                 if (!_state.value.currentEp?.name.equals(history.vodRemarks) && history.position != null) {
                     log.debug(
-                        "剧集名称发生变化且有播放位置，重置播放位置: {} -> {}",
+                        "[历史记录同步]剧集名称发生变化且有播放位置，重置播放位置: {} -> {}",
                         history.vodRemarks, _state.value.currentEp?.name
                     )
                     // 重置播放位置为 0
@@ -1405,25 +1405,25 @@ class DetailViewModel : BaseViewModel() {
 
                 // 将更新后的历史记录设置到控制器中
                 log.debug(
-                    "设置控制器历史记录: vodFlag={}, vodRemarks={}, position={}",
+                    "[历史记录同步]设置控制器历史记录: vodFlag={}, vodRemarks={}, position={}",
                     history.vodFlag, history.vodRemarks, history.position
                 )
                 controller.setControllerHistory(history)
 
                 // 设置视频播放的起始和结束时间，若未设置则使用默认值 -1
                 log.debug(
-                    "设置片头片尾时间: opening={}, ending={}",
+                    "[历史记录同步]设置片头片尾时间: opening={}, ending={}",
                     history.opening, history.ending
                 )
                 controller.setStartEnd(history.opening ?: -1, history.ending ?: -1)
 
                 // 根据历史记录查找对应的剧集
                 log.debug(
-                    "根据历史记录查找剧集: vodRemarks={}, currentEpNumber={}",
+                    "[历史记录同步]根据历史记录查找剧集: vodRemarks={}, currentEpNumber={}",
                     history.vodRemarks, currentEpisodeIndex
                 )
                 val findEp = detail.findAndSetEpByName(history, currentEpisodeIndex)
-                log.debug("查找剧集结果: {}", findEp?.name ?: "未找到")
+                log.debug("[历史记录同步]查找剧集结果: {}", findEp?.name ?: "未找到")
 
                 // 在默认调度器中更新状态流中的信息
                 withContext(Dispatchers.Default) {
@@ -1437,7 +1437,7 @@ class DetailViewModel : BaseViewModel() {
                             isBuffering = false
                         )
                     }
-                    log.debug("状态更新完成，当前播放URL: {}", findEp?.url ?: "")
+                    log.debug("[历史记录同步]状态更新完成，当前播放URL: {}", findEp?.url ?: "")
                 }
             }
         }
@@ -1586,32 +1586,37 @@ class DetailViewModel : BaseViewModel() {
      * @param i 可选的 URL 对象，用于更新状态流中的当前 URL。
      * @param v 可选的播放 URL 字符串，用于更新状态流中的当前播放 URL。若为 null，则使用空字符串。
      */
-    fun chooseLevel(i: Url?, v: String?) {
+    fun chooseLevel(url: Url?, playUrl: String?) {
+        _state.update { it.copy(isLoading = true, isBuffering = false) }
+
         scope.launch {
-            _state.update { it.copy(isLoading = true, isBuffering = false) }
-            log.debug("切换清晰度，结束播放,当前播放器状态: {}", lifecycleManager.lifecycleState.value)
-
             try {
+                log.debug("切换清晰度,当前播放链接: {}", url)
+                val isDownloadLink = Utils.isDownloadLink(url.toString())
+                val currentEp = _state.value.currentEp
 
-                if (vmPlayerType.first() == PlayerType.Innie.id) {
-                    log.debug("切换清晰度,结束播放,当前播放器状态: {}", lifecycleManager.lifecycleState.value)
-                    // 确保在状态转换前清理旧资源
-                    controller.cleanupBeforeQualityChange()
-
-                    lifecycleManager.transitionTo(Ended) { lifecycleManager.ended() }
-                    lifecycleManager.transitionTo(Ready) { lifecycleManager.ready() }
-
-                } else if (vmPlayerType.first() == PlayerType.Outie.id) {
-                    if (v != null && v.isNotEmpty()) {
-                        val currentEp = _state.value.currentEp
-                        val epName = currentEp?.name ?: "未知剧集"
-                        Play.start(v, epName)
+                if (isDownloadLink) {
+                    log.warn("切换清晰度失败！当前播放链接是下载链接！")
+                    SnackBar.postMsg("切换清晰度失败！当前播放链接是下载链接！", type = SnackBar.MessageType.WARNING)
+                    return@launch
+                } else if (playUrl != null) {
+                    if (vmPlayerType.first() == PlayerType.Innie.id) {
+                        log.debug("切换清晰度,结束播放,当前播放器状态: {}", lifecycleManager.lifecycleState.value)
+                        lifecycleManager.transitionTo(Ended) {
+                            lifecycleManager.ended()
+                        }
+                    }
+                    if (vmPlayerType.first() == PlayerType.Outie.id) {
+                        log.debug("切换清晰度:{}", playUrl)
+                        Play.start(playUrl, currentEp?.name ?: "未知剧集")
+                    }else if (vmPlayerType.first() == PlayerType.Web.id){
+                        openBrowserWithWebPlayer(playUrl, currentEp?.name ?: "未知剧集")
                     }
                 }
                 _state.update {
                     it.copy(
-                        currentPlayUrl = v ?: "",
-                        currentUrl = i,
+                        currentPlayUrl = playUrl ?: "",
+                        currentUrl = url,
                     )
                 }
             } catch (e: Exception) {
@@ -1716,8 +1721,8 @@ class DetailViewModel : BaseViewModel() {
             )
 
             for (i in updatedDetail.currentFlag.episodes) { // 遍历更新后的列表
-                log.debug("剧集: {}, 选中: {}", i.name, i.activated)
                 if (i.activated) {
+                    log.debug("当前选中剧集: {}", i)
                     _state.update { model ->
                         val newModel = model.copy(currentEp = i, detail = updatedDetail) // 更新 currentEp 和 detail
 
@@ -1739,7 +1744,7 @@ class DetailViewModel : BaseViewModel() {
                 return@launch                                // 结束当前协程
             } else {
                 val correctDetailForPlay = _state.value.detail // 获取包含正确 activated 状态的最新 detail
-                startPlay(correctDetailForPlay, it) // 使用最新的 detail 来播放
+                startPlay(correctDetailForPlay, it) // [chooseEp]使用最新的 detail 来播放
             }
         }
     }
