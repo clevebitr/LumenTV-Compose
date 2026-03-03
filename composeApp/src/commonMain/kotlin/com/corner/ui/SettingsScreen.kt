@@ -111,13 +111,9 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
     DisposableEffect("setting") {
         vm.sync()
         onDispose {
+            log.info("设置已保存：\n{}", model.value.settingList.joinToString("\n"))
             SettingStore.write()
         }
-    }
-
-    DisposableEffect(model.value.settingList) {
-        log.info("settingList 修改")
-        onDispose { }
     }
 
     Box(
@@ -634,8 +630,6 @@ fun WindowScope.SettingScene(vm: SettingViewModel, config: M3U8FilterConfig, onC
                         val arr = model.value.settingList.getSetting(SettingType.PLAYER)
                             ?.value?.getPlayerSetting()?.toMutableList()
                             ?: mutableListOf(PlayerType.Innie.id, "")
-
-                        log.info("playerSetting: $arr")
 
                         if (listOf("true", "false").contains(arr[0])) {
                             if (arr[0].toBoolean()) {

@@ -119,15 +119,25 @@ object WebPlayerServer {
     fun stop() {
         if (isRunning.compareAndSet(true, false)) {
             try {
-                server?.stop(1000, 5000)
-                server = null
+                log.debug("开始停止 Web 播放器服务器...")
+                // 清空当前媒体信息，断开逻辑引用
                 currentMediaInfo = null
+                // 停止服务器
+                server?.stop(500, 2000)
+                // 释放服务器引用
+                server = null
                 // 重置端口计数器
                 portCounter.set(9000)
                 currentPort = 0
-                log.info("Web播放器服务器已停止，端口计数器已重置")
+                    
+                log.info("Web 播放器服务器已停止，端口计数器已重置")
             } catch (e: Exception) {
-                log.error("停止Web播放器服务器时出错", e)
+                log.error("停止 Web 播放器服务器时出错", e)
+                // 发生异常时也重置状态，确保可以重新启动
+                server = null
+                currentMediaInfo = null
+                portCounter.set(9000)
+                currentPort = 0
             }
         }
     }
