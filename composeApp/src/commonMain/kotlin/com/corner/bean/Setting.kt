@@ -17,25 +17,25 @@ private val log = LoggerFactory.getLogger("Setting")
 data class Setting(val id: String, val label: String, var value: String = "")
 
 @Serializable
-sealed interface Cache{
-    fun getName():String
+sealed interface Cache {
+    fun getName(): String
 
-    fun add(t:String)
+    fun add(t: String)
 }
 
 @Serializable
-class SearchHistoryCache:Cache{
+class SearchHistoryCache : Cache {
 
-    private val maxSize:Int = 30
+    private val maxSize: Int = 30
 
-    var searchHistoryList:LinkedHashSet<String> = linkedSetOf()
+    var searchHistoryList: LinkedHashSet<String> = linkedSetOf()
     override fun getName(): String {
         return "searchHistory"
     }
 
-    override fun add(t:String) {
-        if(searchHistoryList.size >= maxSize){
-            val list:LinkedHashSet<String> = linkedSetOf()
+    override fun add(t: String) {
+        if (searchHistoryList.size >= maxSize) {
+            val list: LinkedHashSet<String> = linkedSetOf()
             list.addAll(searchHistoryList.drop(1))
             searchHistoryList = list
         }
@@ -43,7 +43,7 @@ class SearchHistoryCache:Cache{
         searchHistoryList.add(t)
     }
 
-    fun getSearchList():List<String>{
+    fun getSearchList(): List<String> {
         return searchHistoryList.toList().reversed()
     }
 
@@ -54,8 +54,8 @@ class SearchHistoryCache:Cache{
 }
 
 @Serializable
-class PlayerStateCache:Cache{
-    private val map:MutableMap<String, String> = mutableMapOf()
+class PlayerStateCache : Cache {
+    private val map: MutableMap<String, String> = mutableMapOf()
     override fun getName(): String {
         return "playerState"
     }
@@ -64,11 +64,11 @@ class PlayerStateCache:Cache{
 
     }
 
-    fun add(key:String, value: String){
+    fun add(key: String, value: String) {
         map[key] = value
     }
 
-    fun get(key: String):String?{
+    fun get(key: String): String? {
         return map[key]
     }
 
@@ -101,7 +101,7 @@ object SettingStore {
         Setting("theme", "主题", "light"),
         Setting("adFilter", "广告过滤", "true"),
         Setting("m3u8FilterConfig", "M3U8 过滤配置", ""),
-        Setting("crawlerSearchTerms", "爬虫搜索词", ""),
+        Setting("crawlerSearchTerms", "爬虫搜索词", "阿甘正传"),
         Setting("dohEnabled", "DoH启用", "false"),
         Setting("dohServer", "DoH服务器", "Tencent")
     )
@@ -112,11 +112,12 @@ object SettingStore {
         getSettingList()
         getM3U8FilterConfig()
     }
+
     fun getSettingItem(s: String): String {
         return settingFile.list.find { it.id == s }?.value ?: ""
     }
 
-    fun getSettingItem(type: SettingType):String{
+    fun getSettingItem(type: SettingType): String {
         return getSettingItem(type.id)
     }
 
@@ -127,7 +128,7 @@ object SettingStore {
         return settingFile.list
     }
 
-    fun reset(){
+    fun reset() {
         settingFile = SettingFile(mutableListOf(), mutableMapOf())
         settingFile.list.addAll(defaultList)
         write()
@@ -144,14 +145,16 @@ object SettingStore {
 
     fun setValue(type: SettingType, s: String) {
         settingFile.list.find { i -> i.id == type.id }?.value = s
+        log.info("将${type.id}设置为：${s}")
         write()
     }
-    fun doWithCache(func:(MutableMap<String, Cache>) -> Unit){
+
+    fun doWithCache(func: (MutableMap<String, Cache>) -> Unit) {
         func(settingFile.cache)
         write()
     }
 
-    fun getCache(name:String): Cache? {
+    fun getCache(name: String): Cache? {
         return settingFile.cache[name]
     }
 
@@ -186,10 +189,10 @@ object SettingStore {
         return setOf()
     }
 
-    fun addSearchHistory(s: String){
+    fun addSearchHistory(s: String) {
         val cache = getCache(SettingType.SEARCHHISTORY.id)
-        if(cache == null) settingFile.cache[SettingType.SEARCHHISTORY.id] = SearchHistoryCache()
-        if(s.trim().isNotBlank()){
+        if (cache == null) settingFile.cache[SettingType.SEARCHHISTORY.id] = SearchHistoryCache()
+        if (s.trim().isNotBlank()) {
             getCache(SettingType.SEARCHHISTORY.id)!!.add(s)
             write()
         }
@@ -235,9 +238,9 @@ object SettingStore {
 data class SettingEnable(
     val isEnabled: Boolean,
     val value: String
-){
-    companion object{
-        fun default():SettingEnable{
+) {
+    companion object {
+        fun default(): SettingEnable {
             return SettingEnable(false, "")
         }
     }
@@ -246,16 +249,16 @@ data class SettingEnable(
 /**
  * boolean#字符串 转换为数组
  */
-fun String.parseAsSettingEnable():SettingEnable{
+fun String.parseAsSettingEnable(): SettingEnable {
     val split = this.split("#")
-    return if(split.size == 1){
+    return if (split.size == 1) {
         SettingEnable(split.first().toBoolean(), "")
-    }else{
+    } else {
         SettingEnable(split.first().toBoolean(), split.last())
     }
 }
 
-fun String.getPlayerSetting(sitePlayerType: String? = ""): List<String>{
+fun String.getPlayerSetting(sitePlayerType: String? = ""): List<String> {
     val internalPlayer = this.split("#")
     // first is site, second app setting
     val type = if (StringUtils.isNotBlank(
