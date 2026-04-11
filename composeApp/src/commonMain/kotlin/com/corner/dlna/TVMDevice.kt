@@ -1,7 +1,5 @@
-package upnp
+package com.corner.dlna
 
-import com.corner.dlna.TVConnectionManagerService
-import com.corner.dlna.TvMAudioRenderingControlService
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jupnp.binding.annotations.AnnotationLocalServiceBinder
@@ -10,21 +8,20 @@ import org.jupnp.model.meta.*
 import org.jupnp.model.types.UDADeviceType
 import org.jupnp.model.types.UDN
 import org.jupnp.support.renderingcontrol.AbstractAudioRenderingControl
-import tv_multiplatform.composeapp.generated.resources.Res
+import lumentv_compose.composeapp.generated.resources.Res
+import java.util.UUID
 
 
 class TVMDevice
     : LocalDevice(
     DeviceIdentity(
-        UDN("d9fff39939cf4dde9c762ccd82629745")
+        UDN(UUID.randomUUID().toString())
     ),
     UDADeviceType("tvm"),
-    DeviceDetails("TV Multiplatform"),
+    DeviceDetails("LumenTV-Compose"),
     createIcons(),
     createService(),
-) {
-
-}
+)
 
 @OptIn(ExperimentalResourceApi::class)
 fun createIcons(): Array<Icon> {
@@ -32,40 +29,41 @@ fun createIcons(): Array<Icon> {
     list.add(
         Icon(
             "image/png",
-            72,
-            68,
-            24,
-            "images/icon-s.png",
-            runBlocking { Res.readBytes("drawable/TV-icon-s.png") }
-        )
-    )
-    list.add(
-        Icon(
-            "image/png",
-            269,
-            248,
-            24,
-            "images/icon-x.png",
-            runBlocking { Res.readBytes("drawable/TV-icon-x.png") }
-        )
-    )
-    list.add(
-        Icon(
-            "image/png",
-            17,
-            40,
+            48,
+            48,
             24,
             "images/icon-xs.png",
-            runBlocking { Res.readBytes("drawable/TV-icon-xs.png") }
+            runBlocking { Res.readBytes("drawable/LumenTV-icon-48.png") }
+        )
+    )
+    list.add(
+        Icon(
+            "image/png",
+            128,
+            128,
+            24,
+            "images/icon-s.png",
+            runBlocking { Res.readBytes("drawable/LumenTV-icon-128.png") }
+        )
+    )
+    list.add(
+        Icon(
+            "image/png",
+            256,
+            256,
+            24,
+            "images/icon-x.png",
+            runBlocking { Res.readBytes("drawable/LumenTV-icon-256.png") }
         )
     )
     return list.toTypedArray()
 }
 
 @Suppress("UNCHECKED_CAST")
-fun createService(): Array<LocalService<out Any>?>{
-    val service = AnnotationLocalServiceBinder().read(TVConnectionManagerService::class.java) as LocalService<TVConnectionManagerService>
-    service.manager = object : DefaultServiceManager<TVConnectionManagerService>(service, null){
+fun createService(): Array<LocalService<*>> {
+    val service =
+        AnnotationLocalServiceBinder().read(TVConnectionManagerService::class.java) as LocalService<TVConnectionManagerService>
+    service.manager = object : DefaultServiceManager<TVConnectionManagerService>(service, null) {
         override fun getLockTimeoutMillis(): Int {
             return LOCK_TIMEOUT
         }
@@ -74,12 +72,11 @@ fun createService(): Array<LocalService<out Any>?>{
             return TVConnectionManagerService()
         }
     }
-//    services[0] = service
 
     val transport =
         AnnotationLocalServiceBinder().read(TvAvTransportService::class.java) as LocalService<TvAvTransportService>
 
-    transport.manager = object : DefaultServiceManager<TvAvTransportService>(transport, null){
+    transport.manager = object : DefaultServiceManager<TvAvTransportService>(transport, null) {
 
         override fun getLockTimeoutMillis(): Int {
             return LOCK_TIMEOUT
@@ -97,7 +94,8 @@ private const val LOCK_TIMEOUT = 5000
 
 @Suppress("UNCHECKED_CAST")
 private fun createRenderingControl(): LocalService<AbstractAudioRenderingControl> {
-    val renderingControlService: LocalService<AbstractAudioRenderingControl> = AnnotationLocalServiceBinder().read(AbstractAudioRenderingControl::class.java) as LocalService<AbstractAudioRenderingControl>
+    val renderingControlService: LocalService<AbstractAudioRenderingControl> =
+        AnnotationLocalServiceBinder().read(AbstractAudioRenderingControl::class.java) as LocalService<AbstractAudioRenderingControl>
     renderingControlService.setManager(object :
         DefaultServiceManager<AbstractAudioRenderingControl>(renderingControlService, null) {
         override fun getLockTimeoutMillis(): Int {

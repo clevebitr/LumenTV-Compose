@@ -27,12 +27,19 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import com.corner.bean.PlayerStateCache
 import com.corner.bean.SettingStore
+import com.corner.util.net.Utils
 import com.corner.catvodcore.viewmodel.GlobalAppState
 import com.corner.ui.nav.vm.DetailViewModel
 import com.corner.ui.player.DefaultControls
@@ -47,6 +54,7 @@ import kotlinx.coroutines.launch
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.awt.Cursor
+import java.awt.MouseInfo
 import java.awt.Point
 import java.awt.Robot
 import java.awt.Toolkit
@@ -55,9 +63,9 @@ import java.util.*
 import kotlin.concurrent.timerTask
 import kotlin.math.abs
 
-const val VIDEO_URL = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+//const val VIDEO_URL = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
-private val log = LoggerFactory.getLogger("Player")
+private val player_log = LoggerFactory.getLogger("Player")
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -70,7 +78,7 @@ fun Player(
 ) {
     val scope = rememberCoroutineScope()
     val showControllerBar = remember(mrl) { mutableStateOf(true) }
-    val controlBarDuration = 5000L
+    val controlBarDuration = 3000L
     val hideJob = remember { mutableStateOf<Job?>(null) }
     val cursorJob = remember { mutableStateOf<Job?>(null) }
     var keepScreenOnJob: Timer? = remember { null }
@@ -79,52 +87,136 @@ fun Player(
     val tip = controller.tip.collectAsState()
     val videoFullScreen = GlobalAppState.videoFullScreen.collectAsState()
     val showMediaInfoDialog = remember { mutableStateOf(false) }
+    var isRightArrowPressed by remember { mutableStateOf(false) }
+    var rightArrowPressTime by remember { mutableStateOf(0L) }
+    var isSpeedUp by remember { mutableStateOf(false) }
+    var longPressJob by remember { mutableStateOf<Job?>(null) }
+
 
     LaunchedEffect(Unit) {
         val volume = SettingStore.getCache("playerState")
         if (volume != null) {
             val v = (volume as PlayerStateCache).get("volume")?.toFloat()
-            controller.doWithPlayState { it.update { it.copy(volume = v ?: .8f) } }
+            controller.doWithPlayState { it -> it.update { it.copy(volume = v ?: .8f) } }
         }
     }
 
     DisposableEffect(videoFullScreen.value, showControllerBar.value) {
         try {
-            log.debug("robot cancle")
             keepScreenOnJob?.cancel()
+
             if (videoFullScreen.value && !showControllerBar.value) {
                 var time = 1
-                if (videoFullScreen.value) {
-                    focusRequester.requestFocus()
-                    keepScreenOnJob = Timer("keepScreenOn")
-                    keepScreenOnJob?.scheduleAtFixedRate(timerTask {
+                focusRequester.requestFocus()
+                keepScreenOnJob = Timer("keepScreenOn").apply {
+                    scheduleAtFixedRate(timerTask {
                         val robot = Robot()
-                        val v = if (time % 2 == 0) 1 else -1
-                        robot.mouseMove((mousePosition.x + v).toInt(), mousePosition.y.toInt())
+                        // 获取当前鼠标位置而不是使用固定值
+                        val currentMousePos = MouseInfo.getPointerInfo().location
+                        val v = if (time % 2 == 0) 10 else -10
+
+                        // 只在x方向微动，y方向保持不变
+                        robot.mouseMove(currentMousePos.x + v, currentMousePos.y)
                         time++
-                        log.debug("robot moveMouse")
                     }, 0, 6000L)
-                } else {
-                    log.debug("robot cancle")
-                    keepScreenOnJob?.cancel()
                 }
             }
         } catch (e: Exception) {
-            log.error("keep screen on timer err:", e)
+            player_log.error("keep screen on timer err:", e)
         }
+
         onDispose {
             keepScreenOnJob?.cancel()
         }
     }
 
     val showCursor = remember { mutableStateOf(true) }
+
     DisposableEffect(mrl) {
         scope.launch {
             if (StringUtils.isNotBlank(mrl)) {
-                controller.load(mrl)
+                player_log.debug("userTriggered : {},自动加载 mrl: {}", userTriggered, !userTriggered)
+                if (!userTriggered) {
+                    controller.load(mrl)
+                }
+                userTriggered = false
             }
         }
         onDispose {
+        }
+    }
+
+    val onKeyEvent: (KeyEvent) -> Boolean = { keyEvent ->
+        when {
+            // 空格键 - 暂停/播放
+            keyEvent.key == Key.Spacebar && keyEvent.type == KeyEventType.KeyDown -> {
+                controller.togglePlayStatus()
+                true
+            }
+
+            // 左箭头 - 回退5秒
+            keyEvent.key == Key.DirectionLeft && keyEvent.type == KeyEventType.KeyDown -> {
+                controller.backward("5s")
+                true
+            }
+
+            keyEvent.key == Key.DirectionRight -> {
+                when (keyEvent.type) {
+                    KeyEventType.KeyDown -> {
+                        // 检查是否已经按下（避免重复触发）
+                        if (!isRightArrowPressed) {
+                            isRightArrowPressed = true
+                            rightArrowPressTime = System.currentTimeMillis()
+                            // 启动长按检测
+                            longPressJob = scope.launch {
+                                delay(300) // 长按判定时间300ms
+                                if (isRightArrowPressed) {
+                                    // 长按触发3倍速
+                                    controller.speed(3.0f)
+                                    isSpeedUp = true
+                                }
+                            }
+                        }
+                        true
+                    }
+
+                    KeyEventType.KeyUp -> {
+                        isRightArrowPressed = false
+                        longPressJob?.cancel()
+                        if (isSpeedUp) {
+                            // 松开恢复1倍速
+                            controller.speed(1.0f)
+                            isSpeedUp = false
+                        } else if (System.currentTimeMillis() - rightArrowPressTime < 300) {
+                            // 短按前进5秒
+                            controller.forward("5s")
+                        }
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+
+            // 上箭头 - 增加音量
+            keyEvent.key == Key.DirectionUp && keyEvent.type == KeyEventType.KeyDown -> {
+                controller.volumeUp()
+                true
+            }
+
+            // 下箭头 - 减少音量
+            keyEvent.key == Key.DirectionDown && keyEvent.type == KeyEventType.KeyDown -> {
+                controller.volumeDown()
+                true
+            }
+
+            // ESC键 - 退出全屏
+            keyEvent.key == Key.Escape && keyEvent.type == KeyEventType.KeyDown && videoFullScreen.value -> {
+                controller.toggleFullscreen()
+                true
+            }
+
+            else -> false
         }
     }
 
@@ -132,6 +224,7 @@ fun Player(
     Box(
         modifier
             .background(Color.Transparent, roundedShape)
+            .onKeyEvent(onKeyEvent)
             .onPointerEvent(PointerEventType.Move) {
                 val current = it.changes.first().position
                 val cel = mousePosition.minus(current)
@@ -188,8 +281,6 @@ fun Player(
         AnimatedVisibility(
             showControllerBar.value,
             modifier = Modifier.align(Alignment.BottomEnd).offset(y = (-1).dp),
-//            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-//            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -226,7 +317,7 @@ fun Player(
             }
         }
         MediaInfoDialog(
-            Modifier.fillMaxWidth(0.5f).fillMaxHeight(0.4f),
+            Modifier.fillMaxWidth(0.6f).fillMaxHeight(0.5f),
             controller.state.value,
             showMediaInfoDialog.value
         ) {
@@ -240,42 +331,53 @@ fun MediaInfoDialog(modifier: Modifier, playerState: PlayerState, show: Boolean,
     val mediaInfo = rememberUpdatedState(playerState.mediaInfo)
     Dialog(modifier, showDialog = show, onClose = onClose) {
         val scrollbar = rememberLazyListState(0)
+        val formattedTime = Utils.formatMilliseconds(mediaInfo.value?.duration ?: 0)
+        val bitRate = if (mediaInfo.value?.bitRate == 0) {
+            "未知"
+        } else {
+            mediaInfo.value?.bitRate
+        }
         Box {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(30.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(30.dp),
-                state = scrollbar,
-                horizontalAlignment = Alignment.CenterHorizontally
+                state = scrollbar
             ) {
                 item {
-                    SelectionContainer {
-                        Text(text = AnnotatedString(mediaInfo.value?.url ?: ""))
+                    Text(
+                        text = "视频详情",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    )
+
+                    Text("分辨率：${mediaInfo.value?.width ?: ""} * ${mediaInfo.value?.height ?: ""}")
+                    Text("视频编码格式：${mediaInfo.value?.videoCodec ?: ""}")
+                    Text("编解码器说明：${mediaInfo.value?.codecDescription ?: ""}")
+                    Text("比特率：${bitRate}")
+                    Text("时长：${formattedTime}")
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text("链接：")
+                        SelectionContainer {
+                            Text(
+                                text = AnnotatedString(mediaInfo.value?.url ?: ""),
+                                modifier = Modifier.padding(start = 10.dp)
+                            )
+                        }
                     }
-                    Spacer(Modifier.size(40.dp))
-                    Text("${mediaInfo.value?.width ?: ""} * ${mediaInfo.value?.height ?: ""}")
                 }
             }
             VerticalScrollbar(
                 rememberScrollbarAdapter(scrollbar),
                 modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = 5.dp, horizontal = 8.dp),
                 style = defaultScrollbarStyle().copy(
-                    unhoverColor = Color.Gray.copy(0.45F),
-                    hoverColor = Color.DarkGray
+                    unhoverColor = Color.Gray.copy(0.3F),
+                    hoverColor = Color.DarkGray.copy(0.7F)
                 )
             )
         }
     }
 }
-
-//@Preview
-//@Composable
-//fun previewMediaInfoDialog(){
-//    AppTheme {
-//        MediaInfoDialog(Modifier.fillMaxSize(), MediaInfo(800, 1200, "http://xxxxxx.com/dddd"), true){
-//
-//        }
-//    }
-//}
 
 private fun createEmptyCursor(): Cursor {
     return Toolkit.getDefaultToolkit().createCustomCursor(

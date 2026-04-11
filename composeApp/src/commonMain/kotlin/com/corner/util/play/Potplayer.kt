@@ -1,6 +1,6 @@
 import com.corner.catvodcore.bean.Result
 import com.corner.catvodcore.bean.v
-import com.corner.catvodcore.util.Paths
+import com.corner.util.io.Paths
 import com.corner.util.play.PlayerCommand
 
 object PotPlayer: PlayerCommand {

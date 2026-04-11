@@ -1,4 +1,7 @@
+package com.corner.ui.theme
+
 import androidx.compose.ui.graphics.Color
+
 // 主色系 (深蓝色调)
 val md_theme_light_primary = Color(0xFF1A2A6C)       // 主色保持深蓝
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)     // 白色文字在primary上
@@ -34,7 +37,6 @@ val md_theme_light_onErrorContainer = Color(0xFF410002)
 // 边缘与特效
 val md_theme_light_outline = Color(0xFF767680)       // 中性中灰色
 val md_theme_light_outlineVariant = Color(0xFFC6C6D0) // 浅灰轮廓变体
-val md_theme_light_shadow = Color(0xFF000000)
 val md_theme_light_surfaceTint = Color(0xFF1A2A6C)   // 主色作为tint
 val md_theme_light_scrim = Color(0xFF000000)
 
@@ -76,10 +78,8 @@ val md_theme_dark_inverseOnSurface = Color(0xFF0D1B2A) // 反色文字
 val md_theme_dark_inverseSurface = Color(0xFFE6F7FF)  // 淡蓝反色表面
 val md_theme_dark_inversePrimary = Color(0xFF1A2A6C) // 深蓝反色primary
 
-val md_theme_dark_shadow = Color(0xFF000000)
 val md_theme_dark_surfaceTint = Color(0xFFA8FF78)   // 亮黄绿作为surface tint
 val md_theme_dark_outlineVariant = Color(0xFF1A2A6C) // 深蓝轮廓变体
 val md_theme_dark_scrim = Color(0xFF000000)
 
 
-val seed = Color(0xFF956E00)

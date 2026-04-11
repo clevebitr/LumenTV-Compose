@@ -1,17 +1,24 @@
 @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "UNCHECKED_CAST")
 package com.github.catvod.net
 
-import com.corner.util.KtorClient.Companion.getProxy
-import com.corner.util.M3U8AdFilterInterceptor
+/**
+ * OkHttp 封装类
+ * 后端抓取使用
+ */
+
+import com.corner.util.m3u8.M3U8AdFilterInterceptor
 import com.github.catvod.crawler.Spider.Companion.safeDns
 import com.github.catvod.crawler.SpiderDebug
 import com.github.catvod.crawler.SpiderDebug.log
 import okhttp3.*
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.Proxy
 import java.time.Duration
 import java.util.Map
 import java.util.concurrent.TimeUnit
+
+private val log = LoggerFactory.getLogger(OkHttp::class.java)
 
 object OkHttp {
     private var client: OkHttpClient? = null
@@ -61,7 +68,14 @@ object OkHttp {
     @JvmStatic
     @Throws(IOException::class)
     fun newCall(url: String): Response {
-        return client().newCall(Request.Builder().url(url).build()).execute()
+        return try {
+            client().newCall(Request.Builder().url(url).build()).execute()
+        } catch (e: IllegalArgumentException) {
+            // URL 格式错误（如端口为 -1），记录日志并返回空响应
+            SpiderDebug.log("URL 格式错误，无法创建请求: $url - ${e.message}")
+            log.warn("Invalid URL format: {} - {}", url, e.message)
+            throw IOException("Invalid URL: $url - ${e.message}", e)
+        }
     }
 
     @JvmStatic
@@ -177,14 +191,23 @@ object OkHttp {
     @JvmStatic
     val builder: OkHttpClient.Builder
         get() = OkHttpClient.Builder()
-            .proxy(getProxy())
+            // 重要：不要直接设置 .proxy()，让 ProxySelector 决定是否需要代理
+            // ProxySelector 会自动排除本地地址（127.0.0.1, localhost 等）
+            // .proxy(getProxy())  // ❌ 这会绕过 ProxySelector，导致本地请求也走代理
             .addInterceptor(OkhttpInterceptor())
-            .addInterceptor(M3U8AdFilterInterceptor.Interceptor()) // 添加拦截器
+            .addInterceptor(M3U8AdFilterInterceptor.Interceptor())
             .dns(dns())
             .connectTimeout(2, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .sslSocketFactory(SSLSocketClient.sSLSocketFactory, SSLSocketClient.x509TrustManager)
             .hostnameVerifier(SSLSocketClient.hostnameVerifier)
+            .apply {
+                // 配置Dispatcher以控制并发
+                dispatcher(okhttp3.Dispatcher().apply {
+                    maxRequests = 64
+                    maxRequestsPerHost = 5
+                })
+            }
 
 }

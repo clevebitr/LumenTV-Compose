@@ -25,13 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.corner.ui.nav.data.DialogState
 import com.corner.ui.nav.vm.DetailViewModel
-import com.corner.ui.video.log
-import com.corner.util.BrowserUtils
+import com.corner.util.play.BrowserUtils
+import org.slf4j.LoggerFactory
+
+private val pngLog = LoggerFactory.getLogger("PngFoundDialog")
 
 @Composable
 fun PngFoundDialog(
     m3u8Url: String,
-    Text: String,
+    text: String,
     onDismiss: () -> Unit,
     onOpenInBrowser: () -> Unit,
     vm: DetailViewModel
@@ -57,7 +59,7 @@ fun PngFoundDialog(
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     Text(
-                        text = Text,
+                        text = text,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 18.sp,
                             lineHeight = 24.sp,
@@ -95,15 +97,16 @@ fun PngFoundDialog(
                         Button(
                             onClick = {
                                 // 从 viewModel 的状态中获取当前选中的剧集 URL
-                                val currentSelectedEpUrl = vm.currentSelectedEpUrl.value
+                                val currentSelectedEpNumber = vm.currentSelectedEpNumber
                                 // 从状态数据里找到对应的剧集
-                                val currentEpisode = vm.state.value.detail.subEpisode.find { it.url == currentSelectedEpUrl }
+                                val currentEpisode =
+                                    vm.state.value.detail.subEpisode.find { it.number == currentSelectedEpNumber }
                                 val episodeName = vm.state.value.detail.vodName ?: ""
                                 val episodeNumber = currentEpisode?.number ?: 0
                                 // 记录用户选择在浏览器打开
                                 DialogState.userChoseOpenInBrowser = true
-                                log?.debug("Name is {},Number is {}",episodeName,episodeNumber)
-                                BrowserUtils.openBrowserWithHtml(m3u8Url,episodeName,episodeNumber)
+                                pngLog.debug("Name is {},Number is {}", episodeName, episodeNumber)
+                                BrowserUtils.openBrowserWithWebPlayer(m3u8Url, episodeName, episodeNumber)
                                 onDismiss()
                             },
                             modifier = Modifier.weight(1f),

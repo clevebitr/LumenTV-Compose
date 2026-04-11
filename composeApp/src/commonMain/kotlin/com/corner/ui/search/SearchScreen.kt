@@ -1,6 +1,6 @@
 package com.corner.ui.search
 
-import SiteViewModel
+import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,18 +9,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.SearchOff
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,11 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowScope
-import com.corner.catvod.enum.bean.Vod
+import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Collect
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.ui.nav.vm.SearchViewModel
@@ -43,10 +39,11 @@ import com.corner.ui.navigation.SearchScreen
 import com.corner.ui.scene.ControlBar
 import com.corner.ui.scene.RatioBtn
 import com.corner.ui.video.VideoItem
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class SearchPageType {
-    page,
-    content
+    PAGE
 }
 
 private val gridConfig = object {
@@ -57,34 +54,54 @@ private val gridConfig = object {
 }
 
 @Composable
-fun WindowScope.SearchScene(vm: SearchViewModel, onClickItem: (Vod) -> Unit, onClickBack: () -> Unit) {
-    var selectPage by remember { mutableStateOf(SearchScreen.Search) }
+fun WindowScope.SearchScene(
+    vm: SearchViewModel,
+    onClickItem: (Vod) -> Unit,
+    onClickBack: () -> Unit
+) {
+    var currentPage by remember { mutableStateOf(SearchScreen.Search) }
+    var isClicking by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    when (selectPage) {
-        SearchScreen.Search -> SearchPage(vm, onClickBack = {
-            onClickBack()
-        }, onSearch = { s ->
-            vm.onSearch(s)
-            selectPage = SearchScreen.SearchResult
-        })
-
-        SearchScreen.SearchResult -> SearchResult(
-            vm, onClickBack = { onClickBack() },
-        ) {
-            onClickItem(it)
+    // 处理返回逻辑
+    val handleBack = {
+        when (currentPage) {
+            SearchScreen.SearchResult -> {
+                // 从搜索结果页回到搜索页
+                currentPage = SearchScreen.Search
+            }
+            SearchScreen.Search -> {
+                if (!isClicking) {
+                    isClicking = true
+                    vm.clear()
+                    onClickBack()
+                    // 延迟重置点击状态
+                    scope.launch {
+                        delay(2000)
+                        isClicking = false
+                    }
+                }
+            }
         }
     }
-}
 
-/*
-@Composable
-@Preview
-fun previewSearchPage(){
-    AppTheme(useDarkTheme = true) {
-        SearchPage {}
+    when (currentPage) {
+        SearchScreen.Search -> SearchPage(
+            vm,
+            onClickBack = handleBack,
+            onSearch = { s ->
+                vm.onSearch(s)
+                currentPage = SearchScreen.SearchResult
+            }
+        )
+
+        SearchScreen.SearchResult -> SearchResult(
+            vm,
+            onClickBack = handleBack,
+            onClickItem = onClickItem
+        )
     }
 }
-*/
 
 @Composable
 private fun WindowScope.SearchResult(
@@ -95,7 +112,6 @@ private fun WindowScope.SearchResult(
     val model = vm.state.collectAsState()
     val searchText = remember { derivedStateOf { model.value.keyword } }
     val result = remember { SiteViewModel.search }
-//    var currentCollect by remember { mutableStateOf<Collect?>(SiteViewModel.search.value[0]) }
     val currentVodList by rememberUpdatedState(model.value.currentVodList)
 
     //焦点控制
@@ -119,7 +135,10 @@ private fun WindowScope.SearchResult(
         }
     }
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
             WindowDraggableArea {
                 //TopBar
                 ControlBar(
@@ -134,7 +153,6 @@ private fun WindowScope.SearchResult(
                             ),
                             shape = RoundedCornerShape(12.dp),
                             onClick = {
-                                vm.clear()
                                 onClickBack()
                             }
                         ) {
@@ -151,14 +169,12 @@ private fun WindowScope.SearchResult(
                             searchText.value,
                             onSearch = { s ->
                                 vm.onSearch(s)
-                            }, model.value.isSearching,
+                            }, model.value.isSearching
                             // 自定义焦点请求逻辑
-                            onFocusRequested = { focusRequester.requestFocus() }
                         )
                     }
                 )
             }
-//        Content
             Row {
                 Box(
                     Modifier.widthIn(min = 120.dp, max = 200.dp)
@@ -177,14 +193,13 @@ private fun WindowScope.SearchResult(
                         LazyColumn(
                             modifier = Modifier
                                 .defaultMinSize(30.dp)
-                                .padding(horizontal = 8.dp,vertical = 4.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(items = result.value.toList()) { item: Collect ->
                                 RatioBtn(
                                     text = item.site?.name ?: "",
                                     onClick = {
-//                                    currentCollect = item
                                         vm.onClickCollection(item)
                                         result.value.forEach { i ->
                                             i.activated.value = (i.site?.key == item.site?.key)

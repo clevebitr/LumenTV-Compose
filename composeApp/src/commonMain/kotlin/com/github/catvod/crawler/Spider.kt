@@ -1,6 +1,6 @@
 package com.github.catvod.crawler
 
-import com.corner.catvodcore.util.Http
+import com.corner.util.net.Http
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 

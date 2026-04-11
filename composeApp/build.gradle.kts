@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.serialization)
     alias(libs.plugins.room)
     alias(libs.plugins.ksp)
-//    id("java")
 }
 
 room {
@@ -15,7 +14,6 @@ room {
 }
 
 dependencies {
-//    implementation("io.ktor:ktor-server-cors:3.1.2")
     ksp(libs.roomCompiler)
 }
 
@@ -25,12 +23,9 @@ kotlin {
 
     sourceSets {
         commonMain {
+            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")
+            
             dependencies {
-                val ktorVer = "3.1.2"
-                val logbackVer = "1.3.14"
-                val hutoolVer = "5.8.27"
-//              val kotlinVersion = extra["kotlin.version"] as String
-//              implementation(project(":CatVod"))
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
@@ -38,9 +33,8 @@ kotlin {
                 implementation(compose.components.resources)
                 implementation(compose.components.uiToolingPreview)
                 implementation(compose.materialIconsExtended)
-//              implementation(libs.roomCompiler)
 
-                // room database access
+                // Database
                 implementation(libs.roomRuntime)
                 implementation(libs.roomGuava)
                 implementation(libs.roomKtx)
@@ -49,74 +43,67 @@ kotlin {
                 implementation(libs.androidx.lifecycle.viewmodel.compose)
                 implementation(libs.androidx.navigation.compose)
 
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-//              implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
+                // JSON Processing
+                api(libs.kotlinx.serialization.json)
 
-                // tool
-                api("com.google.guava:guava:31.1-jre")
-                implementation("cn.hutool:hutool-all:$hutoolVer")
+                // Tools
+                api(libs.guava)
+                implementation(libs.hutool.all)
 
-                //DI
-                api("io.insert-koin:koin-core:3.5.3")
-                api("io.insert-koin:koin-test:3.5.3")
+                // Dependency Injection
+                api(libs.koin.core)
+                api(libs.koin.test)
 
-                // spider depend on
-                api("org.json:json:20231013")
-                implementation("com.google.code.gson:gson:2.10.1")
-                implementation("com.github.lookfirst:sardine:5.10")
-                implementation("cn.wanghaomiao:JsoupXpath:2.5.1")
-                implementation("org.jsoup:jsoup:1.15.3")
-                implementation("com.google.zxing:core:3.3.0")
-                implementation("org.nanohttpd:nanohttpd:2.3.1")
-                implementation("com.github.luben:zstd-jni:1.5.7-4")
+                // Spider Dependencies
+                api(libs.json.org)
+                implementation(libs.gson)
+                implementation(libs.sardine)
+                implementation(libs.jsoupxpath)
+                implementation(libs.jsoup)
+                implementation(libs.zxing.core)
+                implementation(libs.nanohttpd)
+                implementation(libs.zstd.jni)
 
-                //ktor http server
-                implementation("io.ktor:ktor-server-core:$ktorVer")
-                implementation("io.ktor:ktor-server-netty:$ktorVer")
-//                implementation("io.ktor:ktor-server-status-pages:$ktorVer")
-                implementation("io.ktor:ktor-server-cors:$ktorVer")
-                implementation("io.ktor:ktor-server-default-headers:$ktorVer")
-                implementation("io.ktor:ktor-server-content-negotiation:$ktorVer")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVer")
-                implementation("io.ktor:ktor-server-swagger:$ktorVer")
-                implementation("io.ktor:ktor-client-core:$ktorVer")
-                implementation("io.ktor:ktor-client-okhttp:$ktorVer")
+                // Ktor HTTP Server & Client
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.netty)
+                implementation(libs.ktor.server.cors)
+                implementation(libs.ktor.server.default.headers)
+                implementation(libs.ktor.server.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.ktor.server.swagger)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.ktor.server.html.builder)
+                implementation(libs.ktor.server.websockets)
 
-                // log
-                implementation("ch.qos.logback:logback-classic:$logbackVer")
-                // image-loader
+                // Kotlinx HTML
+                implementation(libs.kotlinx.html)
+
+                // Logging
+                implementation(libs.log4j.core)
+                implementation(libs.log4j.api)
+                implementation(libs.log4j.slf4j2.impl)  // SLF4J 到 Log4j2 的桥接
+                implementation(libs.jansi)
+
+                // Image Loader
                 api(libs.image.loader)
-                // optional - Moko Resources Decoder
-//                api("io.github.qdsfdhvh:image-loader-extension-moko-resources:$imageLoader")
 
-                api(project.dependencies.platform("com.squareup.okhttp3:okhttp-bom:5.0.0-alpha.14"))
-                api("com.squareup.okhttp3:okhttp")
-                api("com.squareup.okhttp3:okhttp-dnsoverhttps")
-
+                // OkHttp
+                api(project.dependencies.platform(libs.okhttp.bom))
+                api(libs.okhttp)
+                api(libs.okhttp.dnsoverhttps)
 
                 // DLNA
                 implementation(libs.jupnp.bom.compile)
                 implementation(libs.jupnp.support)
                 implementation(libs.jupnp.osgi)
-                implementation("org.apache.logging.log4j:log4j-api:2.20.0")
 
-                //web-player
-                implementation("org.java-websocket:Java-WebSocket:1.6.0")
+                // WebSocket
+                implementation(libs.java.websocket)
 
-//              implementation(libs.jupnp)
-//              implementation(libs.jetty.servlet)
-//              implementation(libs.jetty.server)
-//              implementation(libs.jetty.client)
-//              implementation(project(":Upnp"))
-
-//              api("com.arkivanov.decompose:decompose:3.3.0")
-//              api("com.arkivanov.decompose:extensions-compose:3.3.0")
-
-//              Add the dependency, typically under the commonMain source set
-
-//              api("com.arkivanov.essenty:lifecycle:2.5.0")
-
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.7.3")
+                // Coroutines
+                implementation(libs.kotlinx.coroutines.swing)
             }
 
         }
@@ -130,19 +117,60 @@ kotlin {
     }
 }
 
+// 生成版本号常量
+tasks.register("generateVersionConstants") {
+    val version = libs.versions.app.version.get()
+    val outputDir = layout.buildDirectory.dir("generated/version").get().asFile
+    val outputFile = File(outputDir, "AppVersion.kt")
+    
+    doLast {
+        outputDir.mkdirs()
+        outputFile.writeText(
+            """
+            package com.corner.util
+            
+            /**
+             * 应用版本号（从 gradle/libs.versions.toml 自动生成）
+             * 不要手动修改此文件！
+             */
+            object AppVersion {
+                const val VERSION = "$version"
+                const val VERSION_NAME = "$version"
+                const val VERSION_CODE = ${version.replace(".", "")}
+            }
+            """.trimIndent()
+        )
+        println("Generated AppVersion.kt with version: $version")
+    }
+}
+
+// 确保在编译前生成版本号
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    dependsOn("generateVersionConstants")
+}
+
+kotlin {
+    sourceSets {
+        commonMain {
+            kotlin.srcDir(layout.buildDirectory.dir("generated/version"))
+        }
+    }
+}
+
 
 compose.desktop {
     application {
         mainClass = "MainKt"
 
         buildTypes.release.proguard {
-//            obfuscate.set(true)
             isEnabled.set(true)
             version.set("7.7.0")
             configurationFiles.from(project.file("src/desktopMain/rules.pro"))
+            obfuscate.set(false)
+            optimize.set(true)
         }
 
-//        jvmArgs("-Dfile.encoding=UTF-8")
+        jvmArgs("-Dfile.encoding=UTF-8")
         jvmArgs("-Dsun.net.http.allowRestrictedHeaders=true")
 
         nativeDistributions {
@@ -162,15 +190,17 @@ compose.desktop {
             val dir = project.layout.projectDirectory.dir("src/desktopMain/appResources")
             println(dir)
             appResourcesRootDir.set(project.layout.projectDirectory.dir("src/desktopMain/appResources"))
-//            app icons https://github.com/JetBrains/compose-multiplatform/tree/master/tutorials/Native_distributions_and_local_execution#app-icon
             windows {
                 iconFile.set(project.file("src/commonMain/composeResources/drawable/LumenTV-icon-win.ico"))
                 dirChooser = true
                 upgradeUuid = "161FA5A0-A30B-4568-9E84-B3CD637CC8FE"
+                perUserInstall = true
+                menu = true
+                shortcut = true
             }
 
             linux {
-                iconFile.set(project.file("src/commonMain/composeResources/drawable/TV-icon-s.png"))
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/LumenTV-icon-256.png"))
             }
 
             macOS {

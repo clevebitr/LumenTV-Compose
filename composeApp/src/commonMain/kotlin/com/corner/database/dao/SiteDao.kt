@@ -18,13 +18,19 @@ interface SiteDao{
     @Query("SELECT * FROM Site where configId = :configId")
     fun findByConfigId(configId: Long): Flow<List<Site>>
 
+    @Query("SELECT * FROM Site")
+    fun getAllSites(): Flow<List<Site>>
+
+    @Query("UPDATE Site SET searchable = :searchable WHERE `key` = :siteKey")
+    suspend fun updateSearchable(siteKey: String, searchable: Long)
+
     @Update
     suspend fun update(site:Site)
 
     @Insert
     suspend fun save(sites: List<Site>)
 
-    suspend fun update(cfg:Config, api: Api): MutableSet<com.corner.catvod.enum.bean.Site> {
+    suspend fun update(cfg:Config, api: Api): MutableSet<com.corner.catvodcore.bean.Site> {
         val sites = api.sites
         val siteList = findByConfigId(cfg.id).firstOrNull()
         if(siteList.isNullOrEmpty() && api.sites.isNotEmpty()){

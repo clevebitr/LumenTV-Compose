@@ -1,13 +1,18 @@
 package com.corner.ui.player.vlcj
 
+import com.corner.ui.scene.SnackBar
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import com.corner.database.entity.History
 import com.corner.ui.nav.vm.DetailViewModel
+import com.corner.ui.player.BitmapPool
 import com.corner.ui.player.PlayerController
+import com.corner.ui.player.PlayerLifecycleManager
 import com.corner.ui.player.frame.FrameRenderer
+import com.corner.util.play.BrowserUtils.scope
+import com.corner.util.thisLogger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +22,6 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ImageInfo
-import org.slf4j.LoggerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.embedded.videosurface.CallbackVideoSurface
 import uk.co.caprica.vlcj.player.embedded.videosurface.VideoSurfaceAdapters
@@ -26,89 +30,210 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCall
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentLinkedQueue
+import javax.swing.SwingUtilities
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 
 class VlcjFrameController(
     component: DetailViewModel,
     private val controller: VlcjController = VlcjController(component),
+    private val bitmapPool: BitmapPool = BitmapPool(3)
 ) : FrameRenderer, PlayerController by controller {
-    private val log = LoggerFactory.getLogger(this::class.java)
-
+    private val log = thisLogger()
     private var byteArray: ByteArray? = null
     private var info: ImageInfo? = null
     val imageBitmapState: MutableState<ImageBitmap?> = mutableStateOf(null)
 
-    var isReleased = true
-    private set
+    @Volatile
+    private var isReleased = false
+    fun isReleased(): Boolean = isReleased
 
     private var historyCollectJob: Job? = null
-
-
     private val _size = MutableStateFlow(0 to 0)
     override val size = _size.asStateFlow()
 
     private val _bytes = MutableStateFlow<ByteArray?>(null)
     override val bytes = _bytes.asStateFlow()
 
-    private val callbackSurFace = CallbackVideoSurface(object : BufferFormatCallback {
-        override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
-            info = ImageInfo.makeN32(sourceWidth, sourceHeight, ColorAlphaType.OPAQUE)
-            return RV32BufferFormat(sourceWidth, sourceHeight)
-        }
+    private var currentBitmap: Bitmap? = null
+    private val pendingRelease = ConcurrentLinkedQueue<Bitmap>()
+    private val callbackSurFace = CallbackVideoSurface(
+        object : BufferFormatCallback {
 
-        override fun newFormatSize(bufferWidth: Int, bufferHeight: Int, displayWidth: Int, displayHeight: Int) {
-        }
+            fun estimateFrameRate(width: Int, height: Int): Int {
+                val pixels = width * height
+                return when {
+                    pixels >= 3_000_000 -> 60 // 高分辨率推高帧率（如2K/4K）
+                    pixels >= 1_000_000 -> 30 // 主流1080p
+                    else -> 24                // 标清或低码率
+                }
+            }
 
-        override fun allocatedBuffers(buffers: Array<out ByteBuffer>) {
-            byteArray = ByteArray(buffers[0].limit())
-        }
-    }, object : RenderCallback {
-        override fun lock(mediaPlayer: MediaPlayer?) {
-        }
+            private var lastPoolSize = -1
+            private var lastWidth = -1
+            private var lastHeight = -1
 
-        override fun display(
-            mediaPlayer: MediaPlayer,
-            nativeBuffers: Array<out ByteBuffer>,
-            bufferFormat: BufferFormat,
-            displayWidth: Int,
-            displayHeight: Int
-        ) {
-            val byteBuffer = nativeBuffers[0]
+            private fun adjustBitmapPoolSize(width: Int, height: Int) {
+                if (width == lastWidth && height == lastHeight) return
 
-            byteBuffer.get(byteArray)
-            byteBuffer.rewind()
+                val resolutionFactor = (width * height) / 1_000_000f
+                val frameRate = estimateFrameRate(width, height)
+                val poolSize = (frameRate * resolutionFactor).roundToInt().coerceIn(2, 12)
 
-            val bmp = Bitmap()
-            bmp.allocPixels(info!!)
-            bmp.installPixels(byteArray)
-            imageBitmapState.value = bmp.asComposeImageBitmap()
-        }
+                if (poolSize != lastPoolSize) {
+                    bitmapPool.setMaxSize(poolSize)
+                    log.info("根据 ${frameRate}fps @ ${width}x$height，调整 BitmapPool 大小为 $poolSize")
+                    lastPoolSize = poolSize
+                }
 
-        override fun unlock(mediaPlayer: MediaPlayer?) {
-        }
-    }, true,
+                lastWidth = width
+                lastHeight = height
+            }
+
+
+            override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
+                info = ImageInfo.makeN32(sourceWidth, sourceHeight, ColorAlphaType.OPAQUE)
+                adjustBitmapPoolSize(width = sourceWidth, height = sourceHeight)
+                return RV32BufferFormat(sourceWidth, sourceHeight)
+            }
+
+
+            override fun newFormatSize(bufferWidth: Int, bufferHeight: Int, displayWidth: Int, displayHeight: Int) {
+            }
+
+            override fun allocatedBuffers(buffers: Array<out ByteBuffer>) {
+                byteArray = ByteArray(buffers[0].limit())
+            }
+            }, object : RenderCallback {
+            override fun lock(mediaPlayer: MediaPlayer?) {
+            }
+
+            override fun display(
+                mediaPlayer: MediaPlayer,
+                nativeBuffers: Array<out ByteBuffer>,
+                bufferFormat: BufferFormat,
+                displayWidth: Int,
+                displayHeight: Int
+            ) {
+                // 增加状态检查
+                if (isReleased) return
+
+                val width = bufferFormat.width
+                val height = bufferFormat.height
+                val byteBuffer = nativeBuffers[0]
+
+                // 增加缓冲区有效性检查
+                if (byteBuffer.limit() <= 0) return
+
+                try {
+                    byteBuffer.get(byteArray)
+                    byteBuffer.rewind()
+
+                    // 从池中获取 Bitmap（复用或新建）
+                    val bmp = bitmapPool.acquire(width, height)
+                    bmp.installPixels(byteArray)
+
+                    currentBitmap?.let {
+                        pendingRelease.add(it)
+                    }
+
+                    releasePendingBitmaps()
+
+                    currentBitmap = bmp
+                    imageBitmapState.value = bmp.asComposeImageBitmap()
+                } catch (e: Exception) {
+                    log.error("渲染帧时发生错误", e)
+                    // 确保在出错时清理资源
+                    currentBitmap?.let {
+                        if (!it.isClosed) it.close()
+                        currentBitmap = null
+                    }
+                }
+            }
+
+            override fun unlock(mediaPlayer: MediaPlayer?) {
+            }
+        }, true,
         VideoSurfaceAdapters.getVideoSurfaceAdapter()
     )
 
+    private fun releasePendingBitmaps() {
+        while (pendingRelease.isNotEmpty()) {
+            val bitmap = pendingRelease.poll()
+            if (!bitmap.isClosed) {
+                bitmapPool.release(bitmap)
+            }
+        }
+    }
+
+    /**
+     * 加载视频URL。
+     * 该方法会异步加载视频URL。
+     * 若加载过程中发生异常，会记录错误日志。
+     * 加载完成后，会自动播放视频并根据历史记录设置播放速度和位置。
+     * 若历史记录中没有位置信息，会默认从视频开头开始播放。
+     *
+     * @param url 视频URL字符串。
+     * @return 返回当前的FrameRenderer实例，用于链式调用。
+     */
+
     override fun load(url: String): PlayerController {
-        controller.load(url)
-        speed(controller.history.value?.speed?.toFloat() ?: 1f)
-        controller.stop()
-//        if(controller.player?.status()?.isPlaying == true){
-//        }
-        controller.play()
-        seekTo(max(controller.history.value?.position ?: 0L, history.value?.opening ?: 0L))
+        scope.launch {
+            log.info("load - 开始加载视频...")
+            controller.loadURL(url, 1000)
+            controller.stop()
+            log.info("load - 视频加载完成，开始初始化播放器")
+            controller.play()//url变化时播放视频
+            delay(500)
+            speed(controller.history.value?.speed?.toFloat() ?: 1f)
+            log.debug("load - 播放历史位置: ${controller.history.value?.position}")
+            seekTo(max(controller.history.value?.position ?: 0L, history.value?.opening ?: 0L))
+        }
         return controller
     }
 
-    override fun init() {
+    override fun vlcjFrameInit() {
         log.info("播放器初始化")
-        controller.init()
-        controller.player?.videoSurface()?.set(callbackSurFace)
-        isReleased = false
+        try {
+            val lifecycleManager = PlayerLifecycleManager(controller)
+            controller.setLifecycleManager(lifecycleManager)
+            controller.init()
+            controller.player?.videoSurface()?.set(callbackSurFace)
+            isReleased = false
+        } catch (e: Exception) {
+            log.error("视频表面初始化失败", e)
+            SnackBar.postMsg("视频表面初始化失败,请尝试重启软件或去GITHUB反馈！", type = SnackBar.MessageType.ERROR)
+        }
     }
 
+    /**
+     * 清理bitmap资源
+     */
+    fun cleanupBeforeQualityChange() {
+        synchronized(this) {
+            // 清理待释放的 bitmap
+            releasePendingBitmaps()
+
+            // 临时禁用渲染回调，防止在切换过程中访问旧资源
+            val player = controller.player
+            player?.videoSurface()?.set(null)
+
+            // 清理当前 bitmap
+            currentBitmap?.let { bitmap ->
+                if (!bitmap.isClosed) {
+                    bitmap.close()
+                }
+                currentBitmap = null
+            }
+
+            // 清空图像状态
+            imageBitmapState.value = null
+        }
+    }
+
+    @Suppress("unused")
     fun isPlaying(): Boolean {
         return !isReleased && controller.player?.status()?.isPlayable == true && controller.player?.status()?.isPlaying == true
     }
@@ -118,10 +243,11 @@ class VlcjFrameController(
     }
 
     fun setControllerHistory(history: History) {
+        log.debug("VlcjFrameController - 设置历史记录{}", history)
         controller.scope.launch {
             controller.history.emit(history)
         }
-        if(historyCollectJob != null) return
+        if (historyCollectJob != null) return
         historyCollectJob = controller.scope.launch {
             delay(10)
             controller.history.collect {
@@ -138,58 +264,86 @@ class VlcjFrameController(
 
     fun doWithHistory(func: (History) -> History) {
         runBlocking {
-            if(controller.history.value == null) return@runBlocking
+            if (controller.history.value == null) return@runBlocking
             controller.history.emit(func(controller.history.value!!))
         }
     }
 
+    @Suppress("unused")
     fun getPlayer(): MediaPlayer? {
         return controller.player
     }
 
-    /**
-     * 原来的代码会出现Invalid memory access问题,尝试修复
-     * */
     fun release() {
-        if (isReleased) return
-        isReleased = true
+        if (isReleased) {
+            log.debug("播放器已释放，跳过重复释放")
+            return
+        }
 
-        try {
-            log.debug("release called")
-            // 0. 先取消所有异步任务（优先级最高）
-            historyCollectJob?.cancel()
+        synchronized(this) {
+            if (isReleased) return
+            isReleased = true
 
-            // 1. 先移除视频表面回调
-            controller.player?.videoSurface()?.set(null)
-
-            // 2. 尝试软停止（带重试）
-            stopPlayerWithRetry()
-
-            // 3. 释放资源
-            controller.player?.release()
-            controller.factory.release()
-            log.debug("Controller released successfully")
-        } catch (e: Throwable) {
-            // 至少记录严重错误
-            log.error("Critical release error", e)
-        } finally {
-            // 确保状态一致
-            historyCollectJob?.cancel()
-            byteArray = null
-            info = null
-            log.debug("Final release state: $isReleased")
+            try {
+                log.debug("=====开始释放播放器资源=====")
+                // 确保在Swing线程中执行释放操作
+                if (!SwingUtilities.isEventDispatchThread()) {
+                    SwingUtilities.invokeAndWait {
+                        doRelease()
+                    }
+                } else {
+                    doRelease()
+                }
+                log.debug("=====资源释放成功=====")
+            } catch (e: Throwable) {
+                log.error("释放播放器资源时出错：", e)
+            }
         }
     }
 
-    private fun stopPlayerWithRetry() {
-        repeat(3) { attempt ->
-            try {
-                controller.player?.controls()?.stop()
+    private fun doRelease() {
+        try {
+            // 0. 清理 BitmapPool
+            bitmapPool.clear()
+            log.debug("已清理 BitmapPool 中的所有 Bitmap 实例")
+
+
+            // 1. 检查播放器是否存在
+            val player = controller.player
+            if (player == null) {
+                log.debug("播放器对象为null，无需释放")
                 return
-            } catch (e: Error) {
-                if (attempt == 2) throw e // 最后一次尝试仍失败则抛出
-                Thread.sleep(100) // 等待100ms后重试
             }
+
+            // 2. 安全停止播放
+            try {
+                player.controls()?.stop()
+                player.videoSurface()?.set(null)
+            } catch (e: Exception) {
+                log.warn("停止播放器时出错：", e)
+            }
+
+            // 3. 延迟确保VLC内部清理
+            Thread.sleep(100)
+
+            // 4. 安全释放
+            try {
+                player.release()
+            } catch (e: Exception) {
+                log.warn("释放播放器时出错：", e)
+            }
+
+            controller.player = null
+
+        } finally {
+            // 清理所有引用
+            historyCollectJob?.cancel()
+            byteArray = null
+            info = null
         }
+    }
+
+    fun hasPlayer(): Boolean {
+        return controller.player != null
     }
 }

@@ -1,9 +1,9 @@
 package com.corner.ui.video
 
-import AppTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,26 +13,43 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.corner.catvod.enum.bean.Vod
-import com.seiko.imageloader.ui.AutoSizeImage
+import com.corner.catvodcore.bean.Vod
+import com.corner.ui.components.AutoSizeImageWithLoading
 import org.jetbrains.compose.resources.painterResource
-import tv_multiplatform.composeapp.generated.resources.Res
-import tv_multiplatform.composeapp.generated.resources.loading
+import lumentv_compose.composeapp.generated.resources.Res
+import lumentv_compose.composeapp.generated.resources.no_img
 
+@Suppress("unused")
 @Composable
 fun HorizontalItem(modifier: Modifier, vod:Vod, onClick:(Vod)->Unit){
     Box(modifier.padding(8.dp)
         .background(MaterialTheme.colorScheme.primaryContainer,RoundedCornerShape(8.dp))
         .clip(RoundedCornerShape(8.dp))
-//        .border(1.dp, Color.Gray,RoundedCornerShape(8.dp))
     ){
         Row(Modifier.padding(8.dp).fillMaxSize()) {
-            AutoSizeImage(url = vod.vodPic ?: "",
-                modifier = Modifier/*.height(150.dp).width(130.dp)*/,
-                contentDescription = vod.vodName,
-                contentScale = ContentScale.Fit,
-                placeholderPainter = { painterResource(Res.drawable.loading) },
-                errorPainter = { painterResource(Res.drawable.loading) })
+            Box(
+                modifier = Modifier
+                    .height(100.dp)
+                    .width(80.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                AutoSizeImageWithLoading(
+                    url = vod.vodPic ?: "",
+                    contentDescription = vod.vodName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    errorPainter = { painterResource(Res.drawable.no_img) },
+                    loadingIndicator = {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).align(Alignment.Center),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                )
+            }
             Spacer(Modifier.size(15.dp))
             Text(vod.vodName ?: "", modifier = Modifier
                 .align(Alignment.CenterVertically)
@@ -40,14 +57,5 @@ fun HorizontalItem(modifier: Modifier, vod:Vod, onClick:(Vod)->Unit){
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
-    }
-}
-
-@androidx.compose.desktop.ui.tooling.preview.Preview
-@Composable
-fun previewHorizonTaoItem(){
-    AppTheme {
-        val v = Vod(vodName = "testedahdkasjfdkladjflkadfdsf")
-        HorizontalItem(Modifier.height(80.dp), v){}
     }
 }

@@ -1,0 +1,329 @@
+package com.corner.ui.player
+
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.slf4j.LoggerFactory
+
+/**
+ * 统一播放器生命周期管理器
+ * 负责协调播放器状态转换和资源管理
+ */
+class PlayerLifecycleManager(
+    private val controller: PlayerController
+) {
+    private val log = LoggerFactory.getLogger("PlayerLifecycleManager")
+
+    private val _lifecycleState = MutableStateFlow(PlayerLifecycleState.Idle)
+    val lifecycleState: StateFlow<PlayerLifecycleState> = _lifecycleState
+
+    private val lifecycleDispatcher = Dispatchers.IO
+
+    /**
+     * 状态转换
+     */
+    suspend fun transitionTo(newState: PlayerLifecycleState): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                log.debug("播放器状态转换: {} -> {}", _lifecycleState.value, newState)
+
+                // 状态验证
+                if (!isValidTransition(_lifecycleState.value, newState)) {
+                    log.warn("无效的状态转换: ${_lifecycleState.value} -> $newState")
+                    return@withContext Result.failure(
+                        IllegalStateException("无效的状态转换: ${_lifecycleState.value} -> $newState")
+                    )
+                }
+
+                _lifecycleState.value = newState
+
+                // 执行状态对应的操作
+                when (newState) {
+                    PlayerLifecycleState.Cleaning -> cleanupInternal()
+                    PlayerLifecycleState.Released -> releaseInternal()
+                    PlayerLifecycleState.Paused -> stopInternal()
+                    PlayerLifecycleState.Initializing_Sync -> initializeSyncInternal()
+                    PlayerLifecycleState.Ready -> readyInternal()
+                    PlayerLifecycleState.Loading -> loadingInternal()
+                    PlayerLifecycleState.Playing -> playingInternal()
+                    PlayerLifecycleState.Ended -> endedInternal()
+                    PlayerLifecycleState.Ended_Async -> endedInternalAsync()
+                    else -> Result.success(Unit)
+                }
+            } catch (e: Exception) {
+                log.error("状态转换失败", e)
+                _lifecycleState.value = PlayerLifecycleState.Error
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 安全地执行状态转换
+     * @param targetState 目标状态
+     * @param action 状态转换动作
+     * @return 转换是否成功执行
+     */
+    suspend fun transitionTo(targetState: PlayerLifecycleState, action: suspend () -> Result<Unit>): Result<Unit> {
+        return if (canTransitionTo(targetState)) {
+            action()
+        } else {
+            Result.failure(IllegalStateException("Cannot transition to $targetState from current state ${lifecycleState.value}"))
+        }
+    }
+
+    fun canTransitionTo(target: PlayerLifecycleState): Boolean {
+        return isValidTransition(lifecycleState.value, target)
+    }
+
+    /**
+     * 同步初始化
+     */
+    suspend fun initializeSync(): Result<Unit> = transitionTo(PlayerLifecycleState.Initializing_Sync)
+
+    private suspend fun initializeSyncInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                controller.vlcjFrameInit()
+                _lifecycleState.value = PlayerLifecycleState.Initialized
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("同步初始化失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+
+    /**
+     * 异步停止播放,用于清理资源
+     */
+    suspend fun cleanup(): Result<Unit> = transitionTo(PlayerLifecycleState.Cleaning)
+
+    private suspend fun cleanupInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                controller.cleanupAsync()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("停止播放失败:", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 停止播放
+     */
+    suspend fun stop(): Result<Unit> = transitionTo(PlayerLifecycleState.Paused)
+
+    private suspend fun stopInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                controller.pause()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("停止播放失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun ended(): Result<Unit> = transitionTo(PlayerLifecycleState.Ended)
+    private suspend fun endedInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                log.debug("<LifecycleManager> -- 停止播放媒体")
+                controller.stop()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("播放结束失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+
+    suspend fun endedAsync(): Result<Unit> = transitionTo(PlayerLifecycleState.Ended_Async)
+    private suspend fun endedInternalAsync(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                log.debug("<LifecycleManager> -- 异步停止播放媒体")
+                controller.stopAsync()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("播放结束失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 完全释放资源
+     */
+    suspend fun release(): Result<Unit> = transitionTo(PlayerLifecycleState.Released)
+
+    private suspend fun releaseInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                synchronized(controller) {
+                    try {
+                        controller.dispose()
+                    } catch (e: Exception) {
+                        // 忽略已释放的错误
+                        if (e.message?.contains("Invalid memory access") == true ||
+                            e.message?.contains("already released") == true
+                        ) {
+                            log.debug("资源已释放，忽略错误")
+                        } else {
+                            throw e
+                        }
+                    }
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("释放失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun ready(): Result<Unit> = transitionTo(PlayerLifecycleState.Ready)
+    private suspend fun readyInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                // 检查播放器实例是否存在
+                if (controller.isPlayerInstanceReady()) {
+                    Result.success(Unit)
+                } else {
+                    log.error("播放器实例不存在")
+                    Result.failure(IllegalStateException("Player not initialized"))
+                }
+            } catch (e: Exception) {
+                log.error("就绪检查失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun loading(): Result<Unit> = transitionTo(PlayerLifecycleState.Loading)
+    private suspend fun loadingInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("加载失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun start() = transitionTo(PlayerLifecycleState.Playing)
+
+    private suspend fun playingInternal(): Result<Unit> {
+        return withContext(lifecycleDispatcher) {
+            try {
+                // 如果已经在播放，直接返回成功
+                if (controller.playerPlaying) {
+                    log.debug("播放器已经在播放状态")
+                    return@withContext Result.success(Unit)
+                }
+                
+                // 调用 Controller 的 play() 方法开始播放
+                log.debug("调用 Controller.play() 开始播放")
+                controller.play()
+                
+                Result.success(Unit)
+            } catch (e: Exception) {
+                log.error("播放失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+
+    /**
+     * 验证状态转换的合法性
+     */
+    private fun isValidTransition(from: PlayerLifecycleState, to: PlayerLifecycleState): Boolean {
+        return when (from) {
+            PlayerLifecycleState.Idle -> to in listOf(
+                PlayerLifecycleState.Initializing,
+                PlayerLifecycleState.Released,
+                PlayerLifecycleState.Initializing_Sync,
+            )
+
+            PlayerLifecycleState.Initializing -> to in listOf(
+                PlayerLifecycleState.Initialized,
+                PlayerLifecycleState.Error,
+                PlayerLifecycleState.Cleaning,
+                PlayerLifecycleState.Paused
+            )
+
+            PlayerLifecycleState.Initialized -> to in listOf(
+                PlayerLifecycleState.Loading,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Loading -> to in listOf(
+                PlayerLifecycleState.Ready,
+                PlayerLifecycleState.Error,
+                PlayerLifecycleState.Ended,
+                PlayerLifecycleState.Ended_Async,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Ready -> to in listOf(
+                PlayerLifecycleState.Playing,
+                PlayerLifecycleState.Paused,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Playing -> to in listOf(
+                PlayerLifecycleState.Paused,
+                PlayerLifecycleState.Ended,
+                PlayerLifecycleState.Ended_Async,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Paused -> to in listOf(
+                PlayerLifecycleState.Playing,
+                PlayerLifecycleState.Ended,
+                PlayerLifecycleState.Ended_Async,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Ended -> to in listOf(
+                PlayerLifecycleState.Ready,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Cleaning -> to in listOf(
+                PlayerLifecycleState.Initializing_Sync,
+                PlayerLifecycleState.Initialized,
+                PlayerLifecycleState.Released,
+                PlayerLifecycleState.Error
+            )
+
+            PlayerLifecycleState.Error -> to in listOf(
+                PlayerLifecycleState.Cleaning,
+                PlayerLifecycleState.Released
+            )
+
+            PlayerLifecycleState.Initializing_Sync -> to in listOf(
+                PlayerLifecycleState.Error,
+                PlayerLifecycleState.Cleaning,
+                PlayerLifecycleState.Loading,
+                PlayerLifecycleState.Paused,
+                PlayerLifecycleState.Initialized
+            )
+
+            PlayerLifecycleState.Ended_Async -> to in listOf(
+                PlayerLifecycleState.Ready,
+                PlayerLifecycleState.Cleaning
+            )
+
+            PlayerLifecycleState.Released -> to == PlayerLifecycleState.Idle
+        }
+    }
+}

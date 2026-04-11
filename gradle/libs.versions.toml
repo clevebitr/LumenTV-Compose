@@ -1,48 +1,121 @@
 [versions]
 compose = "1.8.0-beta01"
 androidx-lifecycle = "2.8.0-rc03"
-junit = "4.13.2"
 kotlin = "2.1.10"
 vlcj = "4.10.1"
-app-version = "1.0.3"
-sqldelight = "2.0.2"
-conveyor = "2.1"
+app-version = "1.1.6"
 room = "2.7.0-alpha13"
 room-sqlite-bundled = "2.5.0-alpha13"
 ksp = "2.1.10-1.0.29"
 jupnp = "3.0.3"
 androidx-navigation = "2.7.0-alpha06"
-jetty = "12.0.16"
 image-loader = '1.10.0'
+
+# HTTP & Network
+ktor = "3.1.2"
+okhttp = "5.0.0-alpha.14"
+
+# JSON Processing
+kotlinx-serialization = "1.7.3"
+gson = "2.10.1"
+json = "20231013"
+
+# Tools & Utils
+guava = "31.1-jre"
+hutool = "5.8.27"
+jsoup = "1.15.3"
+jsoupxpath = "2.5.1"
+sardine = "5.10"
+zxing = "3.3.0"
+nanohttpd = "2.3.1"
+zstd-jni = "1.5.7-4"
+kotlinx-html = "0.11.0"
+java-websocket = "1.6.0"
+
+# Logging
+log4j = "2.20.0"
+jansi = "2.4.0"
+
+# DI
+koin = "3.5.3"
+
+# Coroutines
+kotlinx-coroutines = "1.7.3"
 
 
 [libraries]
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "compose" }
-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
+# Player
 vlcj = { module = "uk.co.caprica:vlcj", version.ref = "vlcj" }
+
+# Database
 roomRuntime = { module = "androidx.room:room-runtime", version.ref = "room" }
 roomCompiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 roomGuava = { module = "androidx.room:room-guava", version.ref = "room" }
 roomKtx = { module = "androidx.room:room-ktx", version.ref = "room" }
 roomBundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "room-sqlite-bundled" }
-jupnp-bom-compile = { module = "org.jupnp.bom:org.jupnp.bom.compile", version.ref = "jupnp"}
-jupnp-bom = { module = "org.jupnp.bom:org.jupnp.bom", version.ref = "jupnp" }
-jupnp-osgi = { module = "org.jupnp:org.jupnp.osgi", version.ref = "jupnp" }
-#jupnp-tool = { module = "org.jupnp.pom:tools", version.ref = "jupnp"}
-jupnp-bom-runtime = { module = "org.jupnp:org.jupnp.runtime" }
-jupnp-bundles = { module = "org.jupnp.pom:bundles", version.ref = "jupnp" }
-jupnp = { module = "org.jupnp:jupnp", version.ref = "jupnp" }
-jupnp-support = { module = "org.jupnp:org.jupnp.support", version.ref = "jupnp" }
-jetty-servlet = { module = "org.eclipse.jetty.ee10:jetty-ee10-servlet", version.ref = "jetty"}
-jetty-server = { module = "org.eclipse.jetty.http2:jetty-http2-server", version.ref = "jetty"}
-jetty-client = { module = "org.eclipse.jetty:jetty-client", version.ref = "jetty"}
+
+# Lifecycle & Navigation
 androidx-lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "androidx-navigation" }
+
+# Image Loading
 image-loader = {module = "io.github.qdsfdhvh:image-loader", version.ref = "image-loader"}
+
+# Ktor Server
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+
+# Ktor Client
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+
+# OkHttp
+okhttp-bom = { module = "com.squareup.okhttp3:okhttp-bom", version.ref = "okhttp" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-dnsoverhttps = { module = "com.squareup.okhttp3:okhttp-dnsoverhttps", version.ref = "okhttp" }
+
+# JSON Processing
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+json-org = { module = "org.json:json", version.ref = "json" }
+
+# Tools & Utils
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+hutool-all = { module = "cn.hutool:hutool-all", version.ref = "hutool" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+jsoupxpath = { module = "cn.wanghaomiao:JsoupXpath", version.ref = "jsoupxpath" }
+sardine = { module = "com.github.lookfirst:sardine", version.ref = "sardine" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
+zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
+kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-html" }
+java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "java-websocket" }
+
+# Logging
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
+log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }  # SLF4J 桥接
+jansi = { module = "org.fusesource.jansi:jansi", version.ref = "jansi" }
+
+# Dependency Injection
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
+
+# Coroutines
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+
+# DLNA
+jupnp-bom-compile = { module = "org.jupnp.bom:org.jupnp.bom.compile", version.ref = "jupnp"}
+jupnp-osgi = { module = "org.jupnp:org.jupnp.osgi", version.ref = "jupnp" }
+jupnp-support = { module = "org.jupnp:org.jupnp.support", version.ref = "jupnp" }
 
 
 [plugins]
@@ -50,8 +123,5 @@ jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
-conveyor = { id = "dev.hydraulic.conveyor", version.ref = "conveyor" }
 room = { id = "androidx.room", version.ref = "room" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-platform = { id = "java-platform"}

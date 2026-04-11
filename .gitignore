@@ -2,6 +2,7 @@
 .gradle
 /local.properties
 /.idea
+/.lingma
 .DS_Store
 build/
 /captures
@@ -18,4 +19,5 @@ cache
 **/*.log
 
 /desktopApp/data/
+.fleet
 #/composeApp/src/desktopMain/resources/res

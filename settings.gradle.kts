@@ -1,9 +1,9 @@
-rootProject.name = "TV-Multiplatform"
+rootProject.name = "LumenTV-Compose"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
     repositories {
-//        特殊网络环境下使用第三方镜像库
+        // 特殊网络环境下使用第三方镜像库
 //        maven { url = uri("https://maven.aliyun.com/repository/public/") }
 //        maven { url = uri("https://maven.aliyun.com/repositories/jcenter") }
 //        maven { url = uri("https://maven.aliyun.com/repositories/google") }
@@ -30,7 +30,7 @@ plugins {
 
 dependencyResolutionManagement {
     repositories {
-//        特殊网络环境下使用第三方镜像库
+        //特殊网络环境下使用第三方镜像库
 //        maven { url = uri("https://maven.aliyun.com/repository/public/") }
 //        maven { url = uri("https://maven.aliyun.com/repositories/jcenter") }
 //        maven { url = uri("https://maven.aliyun.com/repositories/google") }

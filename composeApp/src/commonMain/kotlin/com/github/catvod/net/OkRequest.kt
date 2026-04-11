@@ -1,7 +1,7 @@
 @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "UNCHECKED_CAST")
 package com.github.catvod.net
 
-import com.corner.catvodcore.util.Utils
+import com.corner.util.net.Utils
 import com.github.catvod.crawler.SpiderDebug
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType

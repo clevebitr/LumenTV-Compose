@@ -1,6 +1,6 @@
 package com.corner.ui
 
-import SiteViewModel
+import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -28,7 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowScope
-import com.corner.catvod.enum.bean.Vod
+import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.viewmodel.GlobalAppState.hideProgress
 import com.corner.catvodcore.viewmodel.GlobalAppState.showProgress
 import com.corner.database.dao.buildVod
@@ -36,11 +36,11 @@ import com.corner.database.entity.History
 import com.corner.ui.nav.vm.HistoryViewModel
 import com.corner.ui.scene.BackRow
 import com.corner.ui.scene.ControlBar
-import com.seiko.imageloader.ui.AutoSizeImage
+import com.corner.ui.components.AutoSizeImageWithLoading
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import tv_multiplatform.composeapp.generated.resources.Res
-import tv_multiplatform.composeapp.generated.resources.loading
+import lumentv_compose.composeapp.generated.resources.Res
+import lumentv_compose.composeapp.generated.resources.no_img
 
 @Composable
 fun HistoryItem(
@@ -66,14 +66,27 @@ fun HistoryItem(
         }) {
             // 将Box布局改为Column以垂直排列内容
             Column(modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = modifier) {
-                    AutoSizeImage(
+                Box(
+                    modifier = modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    AutoSizeImageWithLoading(
                         url = history.vodPic!!,
-                        modifier = Modifier.height(220.dp),
                         contentDescription = history.vodName,
+                        modifier = Modifier.height(220.dp).fillMaxWidth(),
                         contentScale = ContentScale.Crop,
-                        placeholderPainter = { painterResource(Res.drawable.loading) },
-                        errorPainter = { painterResource(Res.drawable.loading) })
+                        errorPainter = { painterResource(Res.drawable.no_img) },
+                        loadingIndicator = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp).align(Alignment.Center),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    )
+                    
                     Text(
                         text = history.vodName!!,
                         modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
@@ -130,6 +143,7 @@ fun HistoryItem(
 fun WindowScope.HistoryScene(vm: HistoryViewModel, onClickItem: (Vod) -> Unit, onClickBack: () -> Unit) {
     val model = vm.state.collectAsState()
     var chooseHistory by remember { mutableStateOf<History?>(null) }
+
     LaunchedEffect(Unit) {
         showProgress()
         SiteViewModel.viewModelScope.launch {
@@ -266,7 +280,6 @@ fun WindowScope.HistoryScene(vm: HistoryViewModel, onClickItem: (Vod) -> Unit, o
                         }) {
                         onClickItem(it.buildVod())
                         chooseHistory = it
-//                        showDetailDialog = true
                     }
                 }
             }

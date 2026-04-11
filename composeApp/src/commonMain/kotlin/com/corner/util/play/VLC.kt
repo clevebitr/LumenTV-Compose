@@ -2,7 +2,7 @@ package com.corner.util.play
 
 import com.corner.catvodcore.bean.Result
 import com.corner.catvodcore.bean.v
-import com.corner.catvodcore.util.Paths
+import com.corner.util.io.Paths
 
 object VLC: PlayerCommand {
     override fun title(title: String): String {

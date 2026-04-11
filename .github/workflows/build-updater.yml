@@ -1,0 +1,74 @@
+name: Build Updater
+
+# 仅作为可复用工作流，不自动触发
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-updater:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary_name: updater
+            output_name: updater
+            artifact_suffix: linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary_name: updater
+            output_name: updater
+            artifact_suffix: linux-arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            binary_name: updater.exe
+            output_name: updater.exe
+            artifact_suffix: windows-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary_name: updater
+            output_name: updater
+            artifact_suffix: macos-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary_name: updater
+            output_name: updater
+            artifact_suffix: macos-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
+        working-directory: ./updater
+        shell: bash
+        run: |
+          go mod tidy
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -ldflags="-s -w" -o ${{ matrix.binary_name }} .
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+
+      - name: Upload updater artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-${{ matrix.artifact_suffix }}
+          path: ./updater/${{ matrix.binary_name }}
+          retention-days: 1

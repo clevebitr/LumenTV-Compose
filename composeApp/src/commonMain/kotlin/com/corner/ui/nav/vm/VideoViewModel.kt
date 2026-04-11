@@ -1,9 +1,9 @@
 package com.corner.ui.nav.vm
 
-import SiteViewModel
+import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.runtime.mutableStateOf
-import com.corner.catvod.enum.bean.Site
-import com.corner.catvod.enum.bean.Vod
+import com.corner.catvodcore.bean.Site
+import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Filter
 import com.corner.catvodcore.bean.Result
 import com.corner.catvodcore.bean.Type
@@ -16,6 +16,7 @@ import com.corner.catvodcore.viewmodel.GlobalAppState.showProgress
 import com.corner.database.Db
 import com.corner.ui.nav.BaseViewModel
 import com.corner.ui.nav.data.VideoScreenState
+import com.corner.ui.scene.SnackBar
 import com.corner.util.isEmpty
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,7 +27,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
-import com.corner.ui.scene.SnackBar
 
 class VideoViewModel : BaseViewModel() {
     private val _state = MutableStateFlow(VideoScreenState())
@@ -38,13 +38,13 @@ class VideoViewModel : BaseViewModel() {
 
     init {
         scope.launch {
-            GlobalAppState.home.collect {
+            home.collect {
                 homeLoad()
             }
         }
         scope.launch {
             GlobalAppState.clear.collect {
-                log.debug("清空")
+                log.debug("清空视频数据")
                 clear()
             }
         }
@@ -67,6 +67,7 @@ class VideoViewModel : BaseViewModel() {
             )
         }
     }
+
     private var loadJob: Job? = null
     fun homeLoad(forceRefresh: Boolean = false) {
         //取消前一个任务
@@ -86,7 +87,7 @@ class VideoViewModel : BaseViewModel() {
                 }
 
                 if (!_state.value.homeLoaded) {
-                    val home = GlobalAppState.home.value
+                    val home = home.value
                     if (home.isEmpty()) {
                         log.debug("主页配置为空")
                         isLoading.value = false
@@ -107,7 +108,10 @@ class VideoViewModel : BaseViewModel() {
                     if (list.isEmpty()) {
                         if (classList.isEmpty()) {
                             log.debug("没有可用的分类")
-                            SnackBar.postMsg("没有可用的分类,请尝试切换站源或重新加载")
+                            SnackBar.postMsg(
+                                "没有可用的分类,请尝试切换站源或重新加载",
+                                type = SnackBar.MessageType.WARNING
+                            )
                             isLoading.value = false
                             return@launch
                         }
@@ -117,7 +121,10 @@ class VideoViewModel : BaseViewModel() {
 
                         if (!result.isSuccess || result.list.isEmpty()) {
                             log.debug("加载分类内容失败")
-                            SnackBar.postMsg("加载分类内容失败,请尝试切换站源或重新加载")
+                            SnackBar.postMsg(
+                                "加载分类内容失败,请尝试切换站源或重新加载",
+                                type = SnackBar.MessageType.WARNING
+                            )
                             isLoading.value = false
                             return@launch
                         }
@@ -258,7 +265,7 @@ class VideoViewModel : BaseViewModel() {
                     idx++
                     delay(2000)
                 }
-            } catch (e: CancellationException) {
+            } catch (_: CancellationException) {
                 // 正常取消不记录错误
                 _state.update { it.copy(isRunning = false) }
             } catch (e: Exception) {
@@ -322,7 +329,7 @@ class VideoViewModel : BaseViewModel() {
             } else {
                 state.value.page.set(1)
                 val result = SiteViewModel.categoryContent(
-                    GlobalAppState.home.value.key,
+                    home.value.key,
                     type.typeId,
                     state.value.page.get().toString(),
                     false,

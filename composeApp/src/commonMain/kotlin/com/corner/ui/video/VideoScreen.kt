@@ -1,22 +1,26 @@
 package com.corner.ui.video
 
-import SiteViewModel
+import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.material.Text
+import androidx.compose.material3.Card
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -24,9 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.ContentScale
@@ -40,8 +42,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.zIndex
-import com.corner.catvod.enum.bean.Site
-import com.corner.catvod.enum.bean.Vod
+import androidx.compose.ui.graphics.Brush
+import com.corner.catvodcore.bean.Site
+import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Type
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.catvodcore.enum.ConfigType
@@ -52,27 +55,40 @@ import com.corner.init.Init
 import com.corner.init.Init.Companion.initConfig
 import com.corner.ui.nav.vm.VideoViewModel
 import com.corner.ui.scene.*
+import com.corner.util.spider.SpiderTestUtil
 import com.corner.util.isScrollingUp
-import com.seiko.imageloader.ui.AutoSizeImage
+import com.corner.ui.components.AutoSizeImageWithLoading
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import tv_multiplatform.composeapp.generated.resources.Res
-import tv_multiplatform.composeapp.generated.resources.folder_back
-import tv_multiplatform.composeapp.generated.resources.loading
-import tv_multiplatform.composeapp.generated.resources.undraw_loading
-
-val log: Logger? = LoggerFactory.getLogger("VideoScreen")
-
+import lumentv_compose.composeapp.generated.resources.Res
+import lumentv_compose.composeapp.generated.resources.folder_back
+import lumentv_compose.composeapp.generated.resources.no_img
 @Composable
-fun VideoItem(modifier: Modifier, vod: Vod, showSite: Boolean, click: (Vod) -> Unit) {
+fun VideoItem(
+    modifier: Modifier,
+    vod: Vod,
+    showSite: Boolean,
+    click: (Vod) -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
     Card(
         modifier = modifier
-            .clickable(enabled = true, onClick = { click(vod) }),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        shape = RoundedCornerShape(8.dp)
+            .clickable(
+                enabled = true,
+                onClick = { click(vod) },
+                interactionSource = interactionSource,
+                indication = null
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         val picModifier = remember { Modifier.height(220.dp).width(200.dp) }
         Box(modifier = modifier) {
@@ -84,43 +100,82 @@ fun VideoItem(modifier: Modifier, vod: Vod, showSite: Boolean, click: (Vod) -> U
                     contentScale = ContentScale.Fit
                 )
             } else {
-                AutoSizeImage(
-                    url = vod.vodPic ?: "",
-                    modifier = picModifier,
-                    contentDescription = vod.vodName,
-                    contentScale = ContentScale.Crop,
-                    placeholderPainter = { painterResource(Res.drawable.undraw_loading) },
-                    errorPainter = { painterResource(Res.drawable.loading) }
+                Box(
+                    modifier = picModifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    AutoSizeImageWithLoading(
+                        url = vod.vodPic ?: "",
+                        contentDescription = vod.vodName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        errorPainter = { painterResource(Res.drawable.no_img) },
+                        loadingIndicator = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp).align(Alignment.Center),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    )
+                }
+            }
+
+            // 悬停时添加高亮效果，保持圆角
+            if (isHovered) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                 )
             }
+
             Box(Modifier.align(Alignment.BottomCenter)) {
                 ToolTipText(
                     text = vod.vodName!!,
                     textStyle = TextStyle(
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = MaterialTheme.colorScheme.onSurface, // 使用主题适配的颜色
                         textAlign = TextAlign.Center
                     ),
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
-                        .fillMaxWidth().padding(0.dp, 10.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
+                        .fillMaxWidth()
+                        .padding(0.dp, 10.dp)
                 )
             }
-            // 左上角
-            Text(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(3.dp))
-                    .zIndex(999f)
-                    .padding(5.dp),
-                text = if (showSite) vod.site?.name ?: "" else vod.vodRemarks ?: "",
-                fontWeight = FontWeight.Bold,
-                style = TextStyle(
-                    color = Color.White,
-                    shadow = Shadow(Color.Black, offset = Offset(2F, 2F), blurRadius = 1.5F)
-                )
-            )
+            // 左上角 - 评分/备注
+            val displayText = if (showSite) vod.site?.name ?: "" else vod.vodRemarks ?: ""
+            if (displayText.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .zIndex(999f)
+                        .padding(6.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f), // 使用主题主色作为背景
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = displayText,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.onPrimary, // 使用主题适配的对比色
+                        )
+                    )
+                }
+            }
         }
     }
 }
+
 @Composable
 fun WindowScope.VideoScene(
     vm: VideoViewModel,
@@ -157,14 +212,14 @@ fun WindowScope.VideoScene(
                 VideoTopBar(
                     vm = vm,
                     onClickSearch = { onClickSwitch(Menu.SEARCH) },
-                    onClickChooseHome = { showChooseHome = true },
+                    onClickChooseHome = { showChooseHome = !showChooseHome },
                     onClickSetting = { onClickSwitch(Menu.SETTING) },
                     onClickHistory = { onClickSwitch(Menu.HISTORY) })
             }
         },
         floatingActionButton = {
             FloatButton(vm, state, scope, showFiltersDialog) {
-                showFiltersDialog = !showFiltersDialog
+                !showFiltersDialog
             }
         }
     ) {
@@ -185,10 +240,9 @@ fun WindowScope.VideoScene(
                 val isLoading by vm.isLoading
                 //加载配置文件时，调用了showProgress，通过监听showProgress的值来决定显示加载图标
                 val showProgress by GlobalAppState.showProgress.collectAsState()
-
-                if (!isInitialized){
+                if (!isInitialized) {
                     emptyShow(
-                        onRefresh = { initConfig() },  // 点击重新初始化
+                        onRefresh = { initConfig() },
                         title = "初始化失败",
                         subtitle = "请检查配置文件地址或重新加载配置",
                         isLoading = showProgress
@@ -212,11 +266,11 @@ fun WindowScope.VideoScene(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             itemsIndexed(list.value, key = { i, item -> item.vodId + item.vodName + i }) { _, item ->
-                                VideoItem(Modifier.animateItem(), item, false) {
+                                VideoItem(Modifier.animateItem(), item, false) { vod ->
                                     if (item.isFolder()) {
-                                        vm.clickFolder(it)
+                                        vm.clickFolder(vod)
                                     } else {
-                                        onClickItem(it)
+                                        onClickItem(vod)
                                     }
                                 }
                             }
@@ -231,7 +285,6 @@ fun WindowScope.VideoScene(
                     state.animateScrollToItem(0)
                 }
             }
-
             FiltersDialog(Modifier.align(Alignment.BottomCenter), showFiltersDialog, vm) {
                 showFiltersDialog = false
             }
@@ -241,65 +294,57 @@ fun WindowScope.VideoScene(
             AnimatedVisibility(show.value) {
                 Box(Modifier.fillMaxSize()) {
                     Surface(
-                        modifier = Modifier.wrapContentHeight()
+                        modifier = Modifier
+                            .wrapContentHeight()
                             .wrapContentWidth()
                             .align(Alignment.BottomStart)
-                            .shadow(8.dp, shape = RoundedCornerShape(10.dp))
-                            .padding(1.dp),
-                        shape = RoundedCornerShape(10.dp)
+                            .padding(start = 16.dp, bottom = 16.dp) // 添加左边距16px和底边距16px
+                            .shadow(8.dp, shape = RoundedCornerShape(10.dp)),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
                     ) {
-                        LazyRow {
-                            items(model.value.dirPaths) {
-                                HoverableText(text = it) {
-                                    SiteViewModel.viewModelScope.launch {
-                                        vm.clickFolder(
-                                            Vod(
-                                                vodId = model.value.dirPaths.subList(
-                                                    0,
-                                                    model.value.dirPaths.indexOf(it) + 1
-                                                ).joinToString("/")
+                        LazyRow(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), // 减少内边距使组件更紧凑
+                            horizontalArrangement = Arrangement.spacedBy(2.dp) // 减少间距使组件更紧凑
+                        ) {
+                            itemsIndexed(model.value.dirPaths) { index, path ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    HoverableText(
+                                        text = path,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    ) {
+                                        SiteViewModel.viewModelScope.launch {
+                                            vm.clickFolder(
+                                                Vod(
+                                                    vodId = model.value.dirPaths.subList(
+                                                        0,
+                                                        index + 1
+                                                    ).joinToString("/")
+                                                )
+                                            )
+                                        }
+                                    }
+                                    if (index < model.value.dirPaths.size - 1) {
+                                        Text(
+                                            text = "/",
+                                            modifier = Modifier.padding(horizontal = 2.dp),
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                             )
                                         )
                                     }
                                 }
-                                Text(text = "/")
                             }
                         }
                     }
                 }
             }
-
-//            DirPath(vm = vm)
         }
     }
 }
-
-//@OptIn(ExperimentalAnimationApi::class)
-//@Composable
-//fun DirPath(showDialog: Boolean = false, vm: VideoViewModel){
-//    val state = vm.model.subscribeAsState()
-//    val show = derivedStateOf {
-//        state.value.dirPaths.size > 1
-//    }
-//    AnimatedVisibility(show.value){
-//        Box(modifier = Modifier.height(80.dp)
-//            .fillMaxHeight(0.3f)
-//            .align(Alignment.BottomStart)
-//            .shadow(8.dp, shape = RoundedCornerShape(10.dp)),
-//            shape = RoundedCornerShape(10.dp)
-//        ) {
-//            LazyRow {
-//                items(state.value.dirPaths){
-//                    HoverableText(text = it){
-//                        SiteViewModel.viewModelScope.launch {
-//                            vm.clickFolder(Vod(vodId = state.value.dirPaths.subList(0, state.value.dirPaths.indexOf(it)).joinToString("/")))
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -610,66 +655,90 @@ fun VideoTopBar(
     )
 }
 
-//@Composable
-//@Preview
-//fun previewImageItem() {
-//    MaterialTheme {
-//        val vod = Vod()
-//        vod.vodId = "/index.php/voddetail/82667.html"
-//        vod.vodName = "Test"
-//        vod.vodPic = "https://pic1.yzzyimg.com/upload/vod/2024-01-09/17047994131.jpg"
-//        vod.vodRemarks = "更新至第10集"
-//        VideoItem(Modifier, vod, true, {})
-//    }
-//}
-
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun ClassRow(vm: VideoViewModel, onCLick: (Type) -> Unit) {
+fun ClassRow(
+    vm: VideoViewModel,
+    onCLick: (Type) -> Unit
+) {
     val model = vm.state.collectAsState()
     val state = rememberLazyListState(0)
     val scope = rememberCoroutineScope()
     val visible = derivedStateOf { state.layoutInfo.visibleItemsInfo.size < model.value.classList.size }
-    Box(modifier = Modifier) {
-        LazyRow(
-            state = state,
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .onPointerEvent(PointerEventType.Scroll) {
-                    scope.launch {
-                        state.scrollBy(it.changes.first().scrollDelta.y * state.layoutInfo.visibleItemsInfo.first().size)
-                    }
-                },
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            contentPadding = PaddingValues(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 5.dp),
-            userScrollEnabled = true
+                .padding(horizontal = 16.dp)
         ) {
-            val list = derivedStateOf { model.value.classList.toList() }
-            items(list.value) { type ->
-                RatioBtn(text = type.typeName, onClick = {
-                    vm.chooseClass(type) {
-                        onCLick(type)
-                    }
-                }, selected = type.selected)
+            LazyRow(
+                state = state,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPointerEvent(PointerEventType.Scroll) {
+                        scope.launch {
+                            state.scrollBy(it.changes.first().scrollDelta.y * state.layoutInfo.visibleItemsInfo.first().size)
+                        }
+                    },
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                contentPadding = PaddingValues(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 5.dp),
+                userScrollEnabled = true
+            ) {
+                val list = derivedStateOf { model.value.classList.toList() }
+                items(list.value) { type ->
+                    RatioBtn(text = type.typeName, onClick = {
+                        vm.chooseClass(type) {
+                            onCLick(type)
+                        }
+                    }, selected = type.selected)
+                }
             }
+
+            // 左侧渐隐效果
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .height(48.dp) // 限制高度为按钮高度
+                    .width(16.dp)
+                    .zIndex(1f) // 确保在上方但不阻挡交互
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to MaterialTheme.colorScheme.background,
+                            1f to Color.Transparent
+                        )
+                    )
+            )
+
+            // 右侧渐隐效果
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .height(48.dp) // 限制高度为按钮高度
+                    .width(16.dp)
+                    .zIndex(1f) // 确保在上方但不阻挡交互
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to Color.Transparent,
+                            1f to MaterialTheme.colorScheme.background
+                        )
+                    )
+            )
         }
+
         if (visible.value) {
             HorizontalScrollbar(
-                rememberScrollbarAdapter(state), modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(top = 10.dp)
+                rememberScrollbarAdapter(state),
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .padding(horizontal = 20.dp)
             )
         }
     }
 }
-
-//@Composable
-//@Preview
-//fun previewClassRow() {
-//    AppTheme {
-//        val list = listOf(Type("1", "ABC"), Type("2", "CDR"), Type("3", "ddr"))
-//        ClassRow(list.toMutableSet()) {}
-//    }
-//}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -683,11 +752,15 @@ fun ChooseHomeDialog(
     val model = vm.state.collectAsState()
     val apiState = ApiConfig.apiFlow.collectAsState()
     val sites by derivedStateOf { apiState.value.sites.toList() }
+    var isTestingAll by remember { mutableStateOf(false) }
+    val enableAdvancedMode by SpiderTestUtil.enableAdvancedMode.collectAsState()
+    val spiderStatusMap by SpiderTestUtil.spiderStatusMapFlow.collectAsState()
+    val testingSites by SpiderTestUtil.testingSites.collectAsState()
 
     AnimatedVisibility(
         visible = showDialog && !isClosing,
-        enter = EnterTransition.None, // 完全禁用进入动画
-        exit = ExitTransition.None    // 完全禁用退出动画
+        enter = EnterTransition.None, // 禁用进入动画
+        exit = ExitTransition.None    // 禁用退出动画
     ) {
         Dialog(
             onDismissRequest = onClose,
@@ -699,22 +772,77 @@ fun ChooseHomeDialog(
         ) {
             Surface(
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(360.dp)
                     .heightIn(min = 200.dp, max = 500.dp),
                 shape = RoundedCornerShape(12.dp),
                 tonalElevation = 8.dp,
                 color = MaterialTheme.colorScheme.background
             ) {
                 Column {
-                    // 标题
-                    Text(
-                        text = "选择首页站点",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    // 标题和操作按钮
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
-                    )
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "选择首页站点",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // 测试所有爬虫按钮
+                            IconButton(
+                                onClick = {
+                                    if (isTestingAll) {
+                                        SpiderTestUtil.cancelAllTests()
+                                        isTestingAll = false
+                                    } else {
+                                        isTestingAll = true
+                                        SpiderTestUtil.testAllSpiders { _, status ->
+                                            // 不再需要手动更新 spiderStatusMap，因为 SpiderTestUtil 会自动更新状态流
+                                            if (status != SpiderTestUtil.SpiderStatus.TESTING) {
+                                                val allCompleted =
+                                                    SpiderTestUtil.spiderStatusMap.values.none { it == SpiderTestUtil.SpiderStatus.TESTING }
+                                                if (allCompleted) {
+                                                    isTestingAll = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayCircle,
+                                    contentDescription = if (isTestingAll) "停止测试" else "测试所有爬虫",
+                                    tint = if (isTestingAll) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // 搜索模式切换
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "搜索模式",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Switch(
+                                    checked = enableAdvancedMode,
+                                    onCheckedChange = { SpiderTestUtil.setEnableAdvancedMode(it) }
+                                )
+                            }
+                        }
+                    }
 
                     // 内容区域
                     Box {
@@ -737,17 +865,20 @@ fun ChooseHomeDialog(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // 站点按钮
                                         OutlinedButton(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.weight(3f).padding(end = 8.dp),
                                             onClick = {
                                                 SiteViewModel.viewModelScope.launch {
                                                     ApiConfig.setHome(item)
                                                     model.value.homeLoaded = false
-                                                    Db.Config.setHome(ApiConfig.api.url, ConfigType.SITE.ordinal, item.key)
+                                                    Db.Config.setHome(
+                                                        ApiConfig.api.url,
+                                                        ConfigType.SITE.ordinal,
+                                                        item.key
+                                                    )
                                                 }
                                                 onClick(item)
                                             },
@@ -771,17 +902,19 @@ fun ChooseHomeDialog(
                                         // 搜索开关
                                         IconToggleButton(
                                             checked = item.isSearchable(),
-                                            onCheckedChange = {
+                                            onCheckedChange = { newValue ->
+                                                // 通过 SpiderTestUtil 更新状态
+                                                SpiderTestUtil.updateSiteStatus(
+                                                    item.key,
+                                                    if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
+                                                )
+                                                // 然后更新数据源
                                                 vm.changeSite {
-                                                    if (item.isSearchable()) {
-                                                        item.searchable = 0
-                                                    } else {
-                                                        item.searchable = 1
-                                                    }
+                                                    item.searchable = if (newValue) 1 else 0
                                                     return@changeSite item
                                                 }
                                             },
-                                            modifier = Modifier.size(36.dp)
+                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
                                         ) {
                                             Icon(
                                                 imageVector = if (item.isSearchable()) Icons.Default.Search else Icons.Default.SearchOff,
@@ -794,17 +927,19 @@ fun ChooseHomeDialog(
                                         // 换源开关
                                         IconToggleButton(
                                             checked = item.isChangeable(),
-                                            onCheckedChange = {
+                                            onCheckedChange = { newValue ->
+                                                // 通过 SpiderTestUtil 更新状态
+                                                SpiderTestUtil.updateSiteStatus(
+                                                    item.key,
+                                                    if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
+                                                )
+                                                // 然后更新数据源
                                                 vm.changeSite {
-                                                    if (item.isChangeable()) {
-                                                        item.changeable = 0
-                                                    } else {
-                                                        item.changeable = 1
-                                                    }
+                                                    item.changeable = if (newValue) 1 else 0
                                                     return@changeSite item
                                                 }
                                             },
-                                            modifier = Modifier.size(36.dp)
+                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
                                         ) {
                                             Icon(
                                                 imageVector = if (item.isChangeable()) Icons.Default.Sync else Icons.Default.SyncDisabled,
@@ -812,6 +947,67 @@ fun ChooseHomeDialog(
                                                 tint = if (item.isChangeable()) MaterialTheme.colorScheme.primary
                                                 else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
+                                        }
+
+                                        // 爬虫状态图标
+                                        val spiderStatus =
+                                            spiderStatusMap.getOrDefault(item.key, SpiderTestUtil.SpiderStatus.UNKNOWN)
+                                        if (spiderStatus != SpiderTestUtil.SpiderStatus.UNKNOWN) {
+                                            Icon(
+                                                imageVector = when (spiderStatus) {
+                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> Icons.Default.CheckCircle
+                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> Icons.Default.Error
+                                                    SpiderTestUtil.SpiderStatus.TESTING -> Icons.Default.Refresh
+                                                    else -> Icons.AutoMirrored.Filled.HelpOutline
+                                                },
+                                                contentDescription = when (spiderStatus) {
+                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> "可用"
+                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> "不可用"
+                                                    SpiderTestUtil.SpiderStatus.TESTING -> "测试中"
+                                                    else -> "未知"
+                                                },
+                                                tint = when (spiderStatus) {
+                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
+                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> MaterialTheme.colorScheme.error
+                                                    SpiderTestUtil.SpiderStatus.TESTING -> MaterialTheme.colorScheme.tertiary
+                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .padding(horizontal = 4.dp)
+                                            )
+                                        }
+
+                                        // 单个测试按钮的 onClick 回调
+                                        IconButton(
+                                            onClick = {
+                                                SpiderTestUtil.updateSiteStatus(item.key, SpiderTestUtil.SpiderStatus.TESTING)
+
+                                                CoroutineScope(Dispatchers.IO).launch {
+                                                    SpiderTestUtil.testSpider(item.key) { siteKey, status ->
+                                                        // 通过 SpiderTestUtil 更新最终状态
+                                                        SpiderTestUtil.updateSiteStatus(siteKey, status)
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp),
+                                            enabled = item.key !in testingSites
+                                        ) {
+                                            if (item.key in testingSites) {
+                                                // 显示加载图标
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(24.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            } else {
+                                                // 显示测试图标
+                                                Icon(
+                                                    Icons.Default.SettingsRemote,
+                                                    contentDescription = "测试爬虫",
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
                                         }
                                     }
                                 }

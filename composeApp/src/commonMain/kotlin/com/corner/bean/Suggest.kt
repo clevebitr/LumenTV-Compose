@@ -1,6 +1,6 @@
 package com.corner.bean
 
-import com.corner.catvodcore.util.Jsons
+import com.corner.util.json.Jsons
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -31,7 +31,7 @@ data class Suggest(
                 val items = mutableListOf<String>()
                 for (item in objectFrom(str).data?: listOf()) items.add(item.name)
                 return items
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return mutableListOf()
             }
         }

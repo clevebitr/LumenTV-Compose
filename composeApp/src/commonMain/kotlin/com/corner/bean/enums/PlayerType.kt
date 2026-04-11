@@ -12,20 +12,11 @@ enum class PlayerType(
     companion object {
         fun getById(id: String):PlayerType{
             return when(id.lowercase()){
-                PlayerType.Innie.id -> PlayerType.Innie
-                PlayerType.Outie.id -> PlayerType.Outie
-                PlayerType.Web.id -> PlayerType.Web
-                else -> PlayerType.Outie
+                Innie.id -> Innie
+                Outie.id -> Outie
+                Web.id -> Web
+                else -> Outie
             }
         }
     }
 }
-
-//fun PlayerType.getById(id: String):PlayerType{
-//    return when(id.lowercase()){
-//        PlayerType.Innie.id -> PlayerType.Innie
-//        PlayerType.Outie.id -> PlayerType.Outie
-//        PlayerType.Web.id -> PlayerType.Web
-//        else -> PlayerType.Outie
-//    }
-//}

@@ -1,10 +1,9 @@
 import cn.hutool.system.SystemUtil
-import com.corner.catvodcore.bean.Result
-import com.corner.catvodcore.util.Jsons
-import com.corner.catvodcore.util.Urls
-import com.corner.catvodcore.util.Utils
+import com.corner.util.json.Jsons
+import com.corner.util.net.Urls
+import com.corner.util.net.Utils
 import com.corner.server.KtorD
-import com.corner.util.KtorClient
+import com.corner.util.network.KtorClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

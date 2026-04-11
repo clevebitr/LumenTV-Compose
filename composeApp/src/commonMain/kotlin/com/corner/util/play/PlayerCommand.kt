@@ -1,9 +1,8 @@
 package com.corner.util.play
 
-import androidx.compose.ui.graphics.Path
 import com.corner.catvodcore.bean.Result
 import com.corner.catvodcore.bean.v
-import com.corner.catvodcore.util.Paths
+import com.corner.util.io.Paths
 import org.apache.commons.lang3.SystemUtils
 
 interface PlayerCommand{
@@ -42,17 +41,17 @@ interface PlayerCommand{
         return header
     }
 }
-
-object Default: PlayerCommand {
-    override fun title(title: String): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun start(time: String): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun subtitle(s: String): String {
-        TODO("Not yet implemented")
-    }
-}
+//
+//object Default: PlayerCommand {
+//    override fun title(title: String): String {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override fun start(time: String): String {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override fun subtitle(s: String): String {
+//        TODO("Not yet implemented")
+//    }
+//}

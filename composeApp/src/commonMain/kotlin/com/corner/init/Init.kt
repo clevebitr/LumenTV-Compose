@@ -24,76 +24,125 @@ import org.apache.commons.lang3.StringUtils
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.slf4j.LoggerFactory
-import java.util.concurrent.atomic.AtomicBoolean
 import androidx.compose.runtime.State
-
-private val isInitialized = AtomicBoolean(false)
+import com.corner.catvodcore.viewmodel.GlobalAppState.resetAllStates
+import com.corner.util.play.BrowserUtils
+import com.corner.util.spider.SpiderTestUtil
 
 private val log = LoggerFactory.getLogger("Init")
+
 class Init {
     companion object {
+        /**
+         * 初始化成功状态
+         * */
         private val _isInitializedSuccessfully = mutableStateOf(false)
         val isInitializedSuccessfully: State<Boolean> = _isInitializedSuccessfully
+
+        /**
+         * Koin实例
+         * */
         private var instance: KoinApplication? = null
+
+        /**
+         * 初始化应用
+         * */
         suspend fun start() {
             showProgress()
             try {
+                //Koin
                 initKoin()
                 //Http Server
                 KtorD.init()
+                //点播源配置
                 initConfig()
+                //一致性初始化
                 initPlatformSpecify()
+                //热搜
                 Hot.getHotList()
+                //播放器
                 VlcJInit.init()
-                GlobalAppState.upnpService = TVMUpnpService().apply {
-                    startup()
-                    sendAlive()
-                }
+                //DLNA
+                initDLNA()
+                //初始化爬虫状态
+                SpiderTestUtil.initializeSpiderStatuses()
             } finally {
                 hideProgress()
             }
         }
 
+        /**
+         * 关闭应用服务
+         * */
         fun stop() {
-            // 1. 先停止业务逻辑
-            GlobalAppState.cancelAllOperations("Application shutdown")
-
-            // 2. 按依赖顺序释放资源
+            GlobalAppState.cancelAllOperations("Application shutdown")// stop CoroutineScope
             try {
-                KtorD.stop() // 先停止网络服务
-                instance?.close() // 关闭应用级资源
-                VlcJInit.release() // 最后释放VLC,避免出现Invalid memory access问题
+                VlcJInit.release()      //release VlcJ
+                resetAllStates()        //reset all states
+                BrowserUtils.cleanupWebSocketServer()  //stop webSocket
+                KtorD.stop()            //stop KtorD
+                stopKoin()              //stop Koin
+                stopDLNA()              //stop DLNA
+                JarLoader.clear()       //clear Jar
             } catch (e: Throwable) {
                 log.error("Cleanup error", e)
             }
         }
 
-
+        /**
+         * 初始化Koin注入框架（Database）
+         * */
         private fun initKoin() {
             instance = startKoin {
-//                logger()
                 modules(appModule)
             }
         }
 
-        fun initConfig() {
-            if (isInitialized.get()) {
+        /**
+         * 停止Koin注入框架（Database）
+         * */
+        private fun stopKoin() {
+            log.info("Stop Koin")
+            instance?.close()
+            instance = null
+        }
+
+        /**
+         * 初始化DLNA功能
+         * */
+        private fun initDLNA() {
+            GlobalAppState.upnpService = TVMUpnpService().apply {
+                startup()
+                sendAlive()
+            }
+        }
+
+        /**
+         * 停止DLNA服务
+         * */
+        private fun stopDLNA() {
+            log.info("Stop DLNA Service")
+            GlobalAppState.upnpService?.shutdown()
+            GlobalAppState.upnpService = null
+        }
+
+        /**
+         * 初始化点播源配置
+         * */
+        fun initConfig(forceReinit: Boolean = false) {
+            if (!forceReinit && _isInitializedSuccessfully.value) {
                 log.warn("配置已初始化，跳过重复操作")
-                _isInitializedSuccessfully.value = true  // 假设已初始化即成功
                 return
             }
-
-            // 新增：初始化广告过滤配置
-            val filterConfig = SettingStore.getM3U8FilterConfig()
-            log.debug("加载广告过滤配置: $filterConfig")
 
             val siteConfig = runBlocking {
                 withContext(Dispatchers.IO) {
                     Db.Config.findOneByType(ConfigType.SITE.ordinal.toLong())
                 }
             } ?: run {
-                log.warn("未找到站点配置")
+                log.error("未找到站点配置")
                 _isInitializedSuccessfully.value = false  // 初始化失败
+                hideProgress()
                 return
             }
 
@@ -106,7 +155,7 @@ class Init {
                 val vod = SettingStore.getSettingItem(SettingType.VOD.id)
 
                 if (StringUtils.isBlank(vod)) {
-                    log.info("未配置点播源，跳过初始化")
+                    log.warn("未配置点播源，跳过初始化")
                     _isInitializedSuccessfully.value = false  // 初始化失败
                     return
                 }
@@ -115,35 +164,37 @@ class Init {
                     cfg = siteConfig,
                     isJson = false,
                     onSuccess = { _isInitializedSuccessfully.value = true },
-                    onError = { e ->
+                    onError = { _ ->
                         _isInitializedSuccessfully.value = false
-                        log.error("配置解析失败", e)
                     }
                 ).init()
                 log.info("初始化完成!")
                 _isInitializedSuccessfully.value = true  // 初始化成功
 
             } catch (e: Exception) {
-                log.error("初始化失败", e)
-                log.error("尝试使用json解析", e)
+                log.error("初始化失败，尝试使用json解析", e)
                 try {
                     ApiConfig.parseConfig(
                         cfg = siteConfig,
                         isJson = true,
                         onSuccess = { _isInitializedSuccessfully.value = true },
-                        onError = { e ->
+                        onError = { _ ->
                             _isInitializedSuccessfully.value = false
-                            log.error("配置解析失败", e)
                         }
                     ).init()
                     _isInitializedSuccessfully.value = true  // 回退方式初始化成功
                 } catch (e2: Exception) {
                     log.error("JSON 解析也失败", e2)
                     _isInitializedSuccessfully.value = false  // 完全失败
+                    hideProgress()
+                    return
                 }
             }
         }
     }
 }
 
+/**
+ * 平台特定的初始化
+ */
 expect fun initPlatformSpecify()

@@ -1,6 +1,6 @@
-package com.corner.catvod.enum.bean
+package com.corner.catvodcore.bean
 
-import com.corner.catvodcore.util.ToStringSerializer
+import com.corner.util.json.ToStringSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
