@@ -47,4 +47,3 @@ dependencyResolutionManagement {
 }
 
 include(":composeApp")
-include(":Web-Player")

@@ -162,22 +162,22 @@ jobs:
         run: |
           echo "📝 生成版本信息文件"
           cat > ./release-files/version.json << EOF
-          {
-            "version": "${{ needs.set-tag.outputs.tag }}",
-            "windows": {
-              "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip",
-              "msi_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi"
-            },
-            "linux": {
-              "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip",
-              "deb_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb"
-            },
-            "mac": {
-              "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip",
-              "dmg_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
-            }
-          }
-          EOF
+{
+  "version": "${{ needs.set-tag.outputs.tag }}",
+  "windows": {
+    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip",
+    "msi_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi"
+  },
+  "linux": {
+    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip",
+    "deb_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb"
+  },
+  "mac": {
+    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip",
+    "dmg_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
+  }
+}
+EOF
 
       - name: 📖 Extract changelog for current version
         id: changelog
@@ -208,7 +208,7 @@ jobs:
           # 如果未找到对应的版本日志，使用默认文本
           if [ -z "$CHANGELOG" ]; then
             echo "⚠️ 未找到 $VERSION_WITH_V 的更新日志，使用默认文本"
-            CHANGELOG="- 发布新版本 $VERSION_WITH_V\n- 详细更新内容请查看 CHANGELOG.md"
+            CHANGELOG=$(printf -- "- 发布新版本 %s\n- 详细更新内容请查看 CHANGELOG.md" "$VERSION_WITH_V")
           fi
           
           echo "✅ 提取到的更新日志:"
