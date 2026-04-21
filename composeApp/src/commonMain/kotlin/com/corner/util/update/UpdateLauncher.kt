@@ -40,8 +40,8 @@ class UpdateLauncher {
                 }
 
                 val currentDir = getCurrentDirectory()
-                val tempDir = System.getProperty("java.io.tmpdir")
-                val tempZipFile = File(tempDir, "LumenTV-update.zip")
+                // 使用传入的 zipFile 参数，而不是硬编码的路径
+                val tempZipFile = zipFile
 
                 val processBuilder = ProcessBuilder()
 

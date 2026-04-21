@@ -1,4 +1,6 @@
 # LumenTV Compose
+## v1.1.8
+- 修复：jupnp问题
 ## v1.1.7
 - 紧急修复：Playwright 驱动加载问题
 - 紧急修复：Api问题

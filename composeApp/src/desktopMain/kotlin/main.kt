@@ -129,23 +129,24 @@ fun main() {
                         downloadProgress = null
                     },
                     onUpdate = {
-                        scope.launch(Dispatchers.IO) {
+                        val currentUpdateResult = updateResult
+                        if (currentUpdateResult != null) {
+                            scope.launch(Dispatchers.IO) {
                             log.info("Starting update process")
                             val tempDir = System.getProperty("java.io.tmpdir")
-                            val zipFile = File(tempDir, "LumenTV-update.zip")
-
+                            val zipFileName = "LumenTV-update-${currentUpdateResult.latestVersion}.zip"
+                            val zipFile = File(tempDir, zipFileName)
                             if (zipFile.exists()) {
-                                log.info("Update file already exists, launching updater directly")
+                                log.info("Update file already exists for version ${currentUpdateResult.latestVersion}, launching updater directly")
                                 scope.launch {
-                                    UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
+                                    UpdateLauncher.launchUpdater(zipFile, currentUpdateResult.updaterUrl)
                                     UpdateLauncher.exitApplication()
                                 }
                                 return@launch
                             }
-
                             log.info("Starting download using downloadUpdate function")
                             UpdateDownloader.downloadUpdate(
-                                updateResult!!.downloadUrl,
+                                currentUpdateResult.downloadUrl,
                                 zipFile
                             ).collect { progress ->
                                 log.info("Received progress update: ${progress::class.simpleName}")
@@ -153,7 +154,7 @@ fun main() {
                                 if (progress is DownloadProgress.Completed) {
                                     log.info("Download completed, launching updater")
                                     scope.launch {
-                                        UpdateLauncher.launchUpdater(zipFile, updateResult!!.updaterUrl)
+                                        UpdateLauncher.launchUpdater(zipFile, currentUpdateResult.updaterUrl)
                                         UpdateLauncher.exitApplication()
                                     }
                                 } else if (progress is DownloadProgress.Failed) {
@@ -161,6 +162,7 @@ fun main() {
                                 }
                                 log.info("Finished collecting download progress")
                             }
+                        }
                         }
                     }
                 )
