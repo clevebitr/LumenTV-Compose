@@ -62,20 +62,31 @@
     private <methods>;
 }
 
-# XML
+# javax.xml.parsers - DOM/SAX
 -keep class javax.xml.parsers.** { *; }
 -keep interface javax.xml.parsers.** { *; }
--keep class org.w3c.dom.** { *; }
--keep interface org.w3c.dom.** { *; }
--keep class org.xml.sax.** { *; }
--dontwarn javax.xml.parsers.**
--dontwarn org.w3c.dom.**
--dontwarn org.xml.sax.**
-
-# DocumentBuilder
 -keepclassmembers class javax.xml.parsers.DocumentBuilder {
     public org.w3c.dom.Document parse(...);
 }
+
+# javax.xml.validation - Schema
+-keep class javax.xml.validation.** { *; }
+-keep interface javax.xml.validation.** { *; }
+-keepclassmembers class javax.xml.validation.SchemaFactory {
+    public javax.xml.validation.Schema newSchema(...);
+}
+
+# org.w3c.dom - DOM API
+-keep class org.w3c.dom.** { *; }
+-keep interface org.w3c.dom.** { *; }
+
+# org.xml.sax - SAX API
+-keep class org.xml.sax.** { *; }
+-keep interface org.xml.sax.** { *; }
+
+-dontwarn javax.xml.**
+-dontwarn org.w3c.dom.**
+-dontwarn org.xml.sax.**
 
 # 日志框架（项目使用 Log4j2）
 -keep class org.apache.logging.log4j.** { *; }
