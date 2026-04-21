@@ -1,7 +1,7 @@
 package com.corner.util.spider
 
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.catvodcore.bean.Site
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.util.net.Http

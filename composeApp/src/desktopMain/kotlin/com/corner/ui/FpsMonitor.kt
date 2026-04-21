@@ -6,9 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
-import com.corner.util.UserDataDirProvider
+import com.corner.util.system.SysVerUtil
+
 /**
  * from  acfun-multiplatform-client
  */
@@ -23,7 +22,7 @@ fun FpsMonitor(modifier: Modifier, settingVersion: Int = 0, fpsMonitorEnabled: B
     var fps by remember { mutableStateOf(0) }
     var lastUpdate by remember { mutableStateOf(0L) }
     val platformName = remember {
-        UserDataDirProvider.currentOs.name
+        SysVerUtil.currentOs.name
     }
     
     Text(

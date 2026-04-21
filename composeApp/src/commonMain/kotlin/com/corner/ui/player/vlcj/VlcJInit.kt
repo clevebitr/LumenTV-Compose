@@ -1,6 +1,6 @@
 package com.corner.ui.player.vlcj
 
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.ui.getPlayerSetting
 import com.corner.ui.scene.SnackBar
 import com.corner.util.thisLogger

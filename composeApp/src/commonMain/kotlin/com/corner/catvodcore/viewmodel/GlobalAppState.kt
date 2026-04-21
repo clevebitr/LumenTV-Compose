@@ -3,9 +3,9 @@ package com.corner.catvodcore.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
-import com.corner.bean.HotData
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
+import com.corner.util.HotData
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.catvodcore.bean.Site
 import com.corner.catvodcore.bean.Vod
 import kotlinx.coroutines.*
@@ -68,6 +68,11 @@ object GlobalAppState {
      * DLNA播放地址
      */
     val DLNAUrl = MutableStateFlow("")
+
+    /**
+     * DLNA投屏停止回调
+     */
+    var onDLNAStop: (() -> Unit)? = null
 
     /**
      * 根协程Job

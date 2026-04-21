@@ -4,7 +4,6 @@ import com.corner.catvodcore.bean.Episode
 import com.corner.catvodcore.bean.Flag
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Vod.Companion.getPage
-import com.corner.util.Constants
 
 /**
  * 根据新的线路和剧集信息构建更新后的 Vod 对象
@@ -15,12 +14,12 @@ fun Vod.buildUpdatedDetail(selectedFlag: Flag, newEp: Episode?): Vod {
     if (newEp != null) {
         val newEpisodeIndex = selectedFlag.episodes.indexOfFirst { ep -> ep.number == newEp.number }
         if (newEpisodeIndex != -1) {
-            newTabIndex = newEpisodeIndex / Constants.EpSize
+            newTabIndex = newEpisodeIndex / Constants.EP_SIZE
         }
     }
     
     val maxTabIndex = if (selectedFlag.episodes.isNotEmpty()) {
-        (selectedFlag.episodes.size - 1) / Constants.EpSize
+        (selectedFlag.episodes.size - 1) / Constants.EP_SIZE
     } else {
         0
     }

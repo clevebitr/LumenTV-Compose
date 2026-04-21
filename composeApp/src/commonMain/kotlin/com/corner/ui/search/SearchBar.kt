@@ -26,9 +26,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import com.corner.bean.Suggest
+import com.corner.util.Suggest
 import com.corner.ui.nav.vm.SearchViewModel
-import com.corner.util.network.KtorClient
+import com.corner.util.net.KtorClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

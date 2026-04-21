@@ -1,5 +1,6 @@
 package com.corner.util.update
 
+import com.corner.util.net.KtorClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -26,32 +27,26 @@ class UpdateDownloader {
         fun downloadUpdate(
             url: String,
             destination: File,
-            client: HttpClient = com.corner.util.network.KtorClient.client
+            client: HttpClient = KtorClient.client
         ): Flow<DownloadProgress> = flow {
             emit(DownloadProgress.Starting)
 
             val tempFile = File(destination.parent, "${destination.name}.tmp")
 
-            // 1. 使用 prepareGet 确保真正的流式下载 (Streaming)
             client.prepareGet(url).execute { httpResponse ->
-                val contentLength = httpResponse.contentLength() ?: 0L // Ktor 扩展方法获取长度
+                val contentLength = httpResponse.contentLength() ?: 0L
                 log.info("Starting download. Length: $contentLength")
 
                 val channel: ByteReadChannel = httpResponse.bodyAsChannel()
                 var totalBytesRead = 0L
-                var lastEmitTime = 0L // 初始为0确保第一次尽快更新
+                var lastEmitTime = 0L
                 var lastEmitProgress = -1
 
-                // 创建文件输出流
                 Files.newOutputStream(tempFile.toPath()).use { output ->
                     val buffer = ByteArray(8192)
-
-                    // 2. 更加健壮的循环读取方式
                     while (!channel.isClosedForRead) {
-                        // 读取数据
                         val bytesRead = channel.readAvailable(buffer)
 
-                        // 如果返回 -1，代表流结束 (EOF)，必须跳出循环
                         if (bytesRead < 0) break
 
                         if (bytesRead > 0) {
@@ -60,16 +55,13 @@ class UpdateDownloader {
 
                             val currentTime = System.currentTimeMillis()
 
-                            // 3. 进度更新逻辑优化
-                            // 限制更新频率为 500ms，或者这是第一次读取
                             if (currentTime - lastEmitTime > 500 || lastEmitTime == 0L) {
                                 val progress = if (contentLength > 0) {
                                     (totalBytesRead * 100 / contentLength).toInt()
                                 } else {
-                                    0 // 未知大小时，进度保持 0 或由 UI 处理 indeterminate 状态
+                                    0
                                 }
 
-                                // 只有进度数字变化，或者对于未知大小的文件（为了更新已读字节数）才发射
                                 if (progress != lastEmitProgress || contentLength == 0L) {
                                     emit(DownloadProgress.Downloading(progress, totalBytesRead, contentLength))
                                     lastEmitProgress = progress
@@ -80,8 +72,6 @@ class UpdateDownloader {
                     }
                 }
 
-                // 4. 确保循环结束后发送最终进度 (即使 Content-Length 未知)
-                // 如果是未知大小，此时我们假设 totalBytesRead 就是总大小
                 val finalLength = if (contentLength > 0) contentLength else totalBytesRead
                 emit(DownloadProgress.Downloading(100, totalBytesRead, finalLength))
 
@@ -107,7 +97,7 @@ class UpdateDownloader {
         suspend fun downloadUpdateSync(
             url: String,
             destination: File,
-            client: HttpClient = com.corner.util.network.KtorClient.client
+            client: HttpClient = KtorClient.client
         ): Result<File> = withContext(Dispatchers.IO) {
             try {
                 val response: HttpResponse = client.get(url)

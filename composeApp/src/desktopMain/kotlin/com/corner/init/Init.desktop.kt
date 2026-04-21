@@ -1,7 +1,7 @@
 package com.corner.init
 
 import com.corner.util.io.Paths
-import com.corner.util.network.KtorHeaderUrlFetcher
+import com.corner.util.net.KtorHeaderUrlFetcher
 import com.seiko.imageloader.ImageLoader
 import com.seiko.imageloader.component.*
 import com.seiko.imageloader.intercept.bitmapMemoryCacheConfig
@@ -18,7 +18,6 @@ fun generateImageLoader(): ImageLoader {
         components {
             add(KtorHeaderUrlFetcher.CustomUrlFetcher)
             setupBase64Components()
-            setupJvmComponents()
             setupSvgComponents()
             setupSkiaComponents(4)
             setupCommonComponents(defaultFileSystem)

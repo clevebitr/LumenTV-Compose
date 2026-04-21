@@ -3,13 +3,14 @@ compose = "1.8.0-beta01"
 androidx-lifecycle = "2.8.0-rc03"
 kotlin = "2.1.10"
 vlcj = "4.10.1"
-app-version = "1.1.6"
+app-version = "1.1.8"
 room = "2.7.0-alpha13"
 room-sqlite-bundled = "2.5.0-alpha13"
 ksp = "2.1.10-1.0.29"
-jupnp = "3.0.3"
+jupnp = "3.0.4"
 androidx-navigation = "2.7.0-alpha06"
 image-loader = '1.10.0'
+twelvemonkeys = '3.12.0'
 
 # HTTP & Network
 ktor = "3.1.2"
@@ -42,6 +43,9 @@ koin = "3.5.3"
 # Coroutines
 kotlinx-coroutines = "1.7.3"
 
+# Playwright for WAF bypass
+playwright = "1.58.0"
+
 
 [libraries]
 # Player
@@ -61,6 +65,17 @@ androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navi
 
 # Image Loading
 image-loader = {module = "io.github.qdsfdhvh:image-loader", version.ref = "image-loader"}
+image-loader-extension-imageio = {module = "io.github.qdsfdhvh:image-loader-extension-imageio", version.ref = "image-loader"}
+
+# TwelveMonkeys ImageIO Plugins for WebP support (Java 8+)
+twelvemonkeys-webp = {module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys"}
+
+# Note: AVIF/HEIF support requires system-level libheif installation
+# To enable AVIF/HEIF, uncomment the following lines and install libheif:
+# - Windows: Install via vcpkg or MSYS2
+# - macOS: brew install libheif
+# - Linux: sudo apt install libheif-dev
+# nightmonkeys-heif = {module = "com.github.gotson.nightmonkeys:imageio-heif", version.ref = "nightmonkeys"}
 
 # Ktor Server
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
@@ -116,6 +131,9 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 jupnp-bom-compile = { module = "org.jupnp.bom:org.jupnp.bom.compile", version.ref = "jupnp"}
 jupnp-osgi = { module = "org.jupnp:org.jupnp.osgi", version.ref = "jupnp" }
 jupnp-support = { module = "org.jupnp:org.jupnp.support", version.ref = "jupnp" }
+
+# Playwright
+playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
 
 
 [plugins]

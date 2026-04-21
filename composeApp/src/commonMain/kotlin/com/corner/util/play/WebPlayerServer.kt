@@ -164,13 +164,16 @@ object WebPlayerServer {
 
             updateMediaInfo(mediaUrl, title, episodeNumber)
 
-            val browserUrl = "http://localhost:$currentPort/player?url=${mediaUrl.encodeURLParameter()}&title=${title.encodeURLParameter()}"
+            // 获取 Ktor 端口（用于 WebSocket 连接）
+            val ktorPort = com.corner.server.KtorD.getPort()
+
+            val browserUrl = "http://localhost:$currentPort/player?url=${mediaUrl.encodeURLParameter()}&title=${title.encodeURLParameter()}&ktorPort=$ktorPort"
                 .let { url ->
                     episodeNumber?.let { "$url&episode=$it" } ?: url
                 }
 
             java.awt.Desktop.getDesktop().browse(java.net.URI(browserUrl))
-            log.info("在浏览器中打开播放页面: $browserUrl")
+            log.info("在浏览器中打开播放页面: $browserUrl (Ktor端口: $ktorPort)")
 
         } catch (e: Exception) {
             log.error("在浏览器中打开播放页面失败", e)

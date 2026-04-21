@@ -1,7 +1,7 @@
-package com.corner.bean
+package com.corner.util.settings
 
 import org.apache.logging.log4j.Level
-import com.corner.bean.enums.PlayerType
+import com.corner.service.player.PlayerType
 import com.corner.util.json.Jsons
 import com.corner.util.io.Paths
 import com.corner.util.m3u8.M3U8FilterConfig
@@ -90,7 +90,8 @@ enum class SettingType(val id: String) {
     CRAWLER_SEARCH_TERMS("crawlerSearchTerms"),
     DOH_ENABLED("dohEnabled"),
     DOH_SERVER("dohServer"),
-    FPS_MONITOR("fpsMonitor");
+    FPS_MONITOR("fpsMonitor"),
+    MINI_PROGRESS_BAR("miniProgressBar");
 
 }
 
@@ -106,7 +107,8 @@ object SettingStore {
         Setting("crawlerSearchTerms", "爬虫搜索词", "阿甘正传"),
         Setting("dohEnabled", "DoH启用", "false"),
         Setting("dohServer", "DoH服务器", "Tencent"),
-        Setting("fpsMonitor", "FPS监控", "false")
+        Setting("fpsMonitor", "FPS监控", "false"),
+        Setting("miniProgressBar", "迷你进度条", "false")
     )
 
     private var settingFile = SettingFile(mutableListOf(), mutableMapOf())
@@ -141,7 +143,6 @@ object SettingStore {
         try {
             Files.write(Paths.setting(), Jsons.encodeToString(settingFile).toByteArray())
         } catch (e: Exception) {
-            // 打印错误日志，方便排查问题
             e.printStackTrace()
         }
     }
@@ -165,13 +166,21 @@ object SettingStore {
         // 初始化设置文件
         val file = Paths.setting()
         if (file.exists() && settingFile.list.isEmpty()) {
-            settingFile = Jsons.decodeFromString<SettingFile>(Files.readString(file))
-            if (settingFile.list.size != defaultList.size) {
-                defaultList.forEach { setting ->
-                    if (settingFile.list.find { setting.id == it.id } == null) {
-                        settingFile.list.add(setting)
+            try {
+                settingFile = Jsons.decodeFromString<SettingFile>(Files.readString(file))
+                if (settingFile.list.size != defaultList.size) {
+                    defaultList.forEach { setting ->
+                        if (settingFile.list.find { setting.id == it.id } == null) {
+                            settingFile.list.add(setting)
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                log.warn("配置文件解析失败，将重置为默认值: ${e.message}")
+                settingFile = SettingFile(mutableListOf(), mutableMapOf())
+                settingFile.list.addAll(defaultList)
+                Files.write(file, Jsons.encodeToString(settingFile).toByteArray())
+                return
             }
         }
         // 初始化缓存

@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -25,6 +24,7 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +35,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,7 +92,21 @@ fun DefaultControls(
     )
 
     PlayerControlsTheme {
-        Box(modifier.fillMaxHeight().background(Color.Black.copy(alpha = 0.8f))) {
+        Box(
+            modifier
+                .fillMaxHeight()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x00000000),
+                            Color(0x0D000000),
+                            Color(0x99000000),
+                            Color(0xD9000000)
+                        )
+                    ),
+                    shape = RoundedCornerShape(4.dp)
+                )
+        ) {
             SliderPreviewPopup(isShowPreviewTime.value, { mousePosition.value.x }, previewTimeText)
             Column(
                 modifier.padding(horizontal = 8.dp),
@@ -104,7 +119,7 @@ fun DefaultControls(
                     onValueChange = { controller.seekTo(it.roundToLong()) },
                     valueRange = 0f..playerState.duration.toFloat(),
                     modifier = Modifier.fillMaxWidth()
-                        .height(30.dp)
+                        .height(20.dp)
                         .hoverable(interactionSource)
                         .onGloballyPositioned { layoutCoordinates ->
                             layoutCoordinates.parentLayoutCoordinates
@@ -123,17 +138,11 @@ fun DefaultControls(
                                 }
                             }
                         },
-                    track = {
-                        androidx.compose.material3.SliderDefaults.Track(
-                            sliderState = it,
-                            modifier = Modifier.height(10.dp),
-                            colors = androidx.compose.material3.SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            ),
-                        )
-                    },
+                    colors = androidx.compose.material3.SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
                 )
                 FlowRow(
                     modifier = Modifier
@@ -190,18 +199,27 @@ fun DefaultControls(
                                     )
                                 }
 
-                                DropdownMenu(
-                                    expanded = showAspectRatioDropdown,
-                                    onDismissRequest = { showAspectRatioDropdown = false }
-                                ) {
-                                    aspectRatios.forEach { (ratio, displayName) ->
-                                        DropdownMenuItem(
-                                            text = { Text(displayName) },
-                                            onClick = {
-                                                controller.setAspectRatio(ratio)
-                                                showAspectRatioDropdown = false
-                                            }
-                                        )
+                                PlayerControlsTheme {
+                                    DropdownMenu(
+                                        expanded = showAspectRatioDropdown,
+                                        onDismissRequest = { showAspectRatioDropdown = false },
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        tonalElevation = 3.dp
+                                    ) {
+                                        aspectRatios.forEach { (ratio, displayName) ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        displayName,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                },
+                                                onClick = {
+                                                    controller.setAspectRatio(ratio)
+                                                    showAspectRatioDropdown = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -219,7 +237,7 @@ fun DefaultControls(
                         )
                     }
                     Row(
-                        modifier = Modifier.widthIn( min = 20.dp, max = 40.dp),
+                        modifier = Modifier.widthIn(min = 20.dp, max = 40.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (playerState.state == PlayState.PLAY) {
@@ -260,12 +278,12 @@ fun DefaultControls(
                             onValueChange = controller::setVolume,
                             modifier = Modifier
                                 .width(90.dp)
-                                .height(15.dp),
+                                .height(20.dp),
                             valueRange = 0f..1.5f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.secondary,
-                                activeTrackColor = MaterialTheme.colorScheme.secondary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            colors = androidx.compose.material3.SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             )
                         )
                         Spacer(Modifier.size(5.dp))
@@ -393,105 +411,123 @@ fun Speed(
         if (currentSpeed in speedOptions) currentSpeed.toString() + "x"
         else "%.1fx".format(currentSpeed)
     }
-
-    Box(
-        modifier = modifier,
-        // 设置内容在水平和垂直方向上居中
-        contentAlignment = Alignment.Center
-    ) {
-        // 倍速选择器
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .clickable { expanded = true }
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+    PlayerControlsTheme {
+        Box(
+            modifier = modifier,
+            // 设置内容在水平和垂直方向上居中
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(Res.drawable.speed),
-                contentDescription = "Speed",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = displayValue,
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 12.sp
-            )
-        }
-
-        // 下拉菜单
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(120.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-        ) {
-            // 预设倍速选项
-            speedOptions.forEach { speed ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            "${speed}x",
-                            color = if (currentSpeed == speed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    onClick = {
-                        currentSpeed = speed
-                        onChange(speed)
-                        expanded = false
-                    }
+            // 倍速选择器
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(Res.drawable.speed),
+                    contentDescription = "Speed",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = displayValue,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 12.sp
                 )
             }
 
-            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-            // 自定义输入区
-            Column(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .fillMaxWidth()
-            ) {
-                androidx.compose.material3.OutlinedTextField(
-                    value = customInput,
-                    onValueChange = {
-                        customInput = it.takeWhile { c -> c.isDigit() || c == '.' }
-                    },
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(2.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .fillMaxWidth()// 确保输入框宽度占满下拉菜单项
-                        .heightIn(min = 40.dp),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    ),
-                    placeholder = { Text("自定义") },
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    )
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                androidx.compose.material3.Button(
-                    onClick = {
-                        customInput.toFloatOrNull()?.let {
-                            if (it > 0) {
-                                currentSpeed = it.coerceAtMost(10f)
-                                onChange(currentSpeed)
+            // 下拉菜单
+            PlayerControlsTheme {
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.width(130.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp
+                ) {
+                    // 预设倍速选项
+                    speedOptions.forEach { speed ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "${speed}x",
+                                    color = if (currentSpeed == speed)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            onClick = {
+                                currentSpeed = speed
+                                onChange(speed)
                                 expanded = false
                             }
+                        )
+                    }
+
+                    Divider()
+
+                    // 自定义输入区
+                    Column(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "自定义倍速",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = customInput,
+                            onValueChange = {
+                                customInput = it.takeWhile { c -> c.isDigit() || c == '.' }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            ),
+                            placeholder = {
+                                Text(
+                                    text = "0.1 - 10.0",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Decimal
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                customInput.toFloatOrNull()?.let {
+                                    if (it > 0) {
+                                        currentSpeed = it.coerceAtMost(10f)
+                                        onChange(currentSpeed)
+                                        expanded = false
+                                    }
+                                }
+                                customInput = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("确认")
                         }
-                        customInput = ""
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(2.dp)
-                ) {
-                    Text("确认")
+                    }
                 }
             }
         }

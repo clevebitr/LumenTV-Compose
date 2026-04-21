@@ -7,7 +7,28 @@ import com.corner.catvodcore.bean.Episode
  * 播放器策略接口
  * 
  * 定义不同播放器类型的播放行为，遵循策略模式
- * 每种播放器类型（Innie/Outie/Web）实现此接口
+ * 支持三种播放器类型：Innie（内部）、Outie（外部）、Web（浏览器）
+ * 
+ * 使用示例：
+ * ```kotlin
+ * // 1. 创建策略
+ * val strategy = PlayerStrategyFactory.createStrategy(
+ *     playerType = PlayerType.Innie.id,
+ *     controller = controller,
+ *     lifecycleManager = lifecycleManager,
+ *     viewModelScope = scope
+ * )
+ * 
+ * // 2. 执行播放
+ * strategy.play(
+ *     result = result,
+ *     episode = episode,
+ *     onPlayStarted = { /* 播放开始回调 */ },
+ *     onError = { error -> /* 错误处理 */ }
+ * )
+ * ```
+ * 
+ * @see PlayerStrategyFactory 工厂类用于创建策略实例
  */
 interface PlayerStrategy {
     /**

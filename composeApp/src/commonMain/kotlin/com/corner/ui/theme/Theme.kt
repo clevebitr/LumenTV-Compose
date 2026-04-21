@@ -103,10 +103,40 @@ val PlayerLightColors = lightColorScheme(
     outline = Color(0xFFDADCE0)    // 边框灰
 )
 
+val PlayerDarkColors = darkColorScheme(
+    primary = Color(0xFF35BCF6),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF35BCF6).copy(alpha = 0.15f),
+    onPrimaryContainer = Color(0xFF35BCF6),
+    secondary = Color(0xFF63C151),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF63C151).copy(alpha = 0.15f),
+    onSecondaryContainer = Color(0xFF63C151),
+    background = Color(0xFF000000),
+    onBackground = Color(0xFFE8EAED),
+    surface = Color(0xFF0A0A0A),   // 纯黑背景
+    onSurface = Color(0xFFE8EAED), // 浅灰文字
+    surfaceVariant = Color(0xFF1A1A1A), // 稍浅的深灰，用于卡片/控件背景
+    onSurfaceVariant = Color(0xFFBDC1C6), // 次要文字颜色
+    outline = Color(0xFF3C4043),    // 深灰边框
+    inverseOnSurface = Color(0xFF202124),
+    inverseSurface = Color(0xFFE8EAED),
+    error = Color(0xFFCF6679),
+    onError = Color(0xFF000000)
+)
+
 @Composable
 fun PlayerControlsTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = PlayerLightColors,
-        content = content
-    )
+    val isDarkTheme = GlobalAppState.isDarkTheme.collectAsState()
+    if (isDarkTheme.value){
+        MaterialTheme(
+            colorScheme = PlayerDarkColors,
+            content = content
+        )
+    }else {
+        MaterialTheme(
+            colorScheme = PlayerLightColors,
+            content = content
+        )
+    }
 }

@@ -1,8 +1,8 @@
 package com.corner.util.net
 
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
-import com.corner.bean.parseAsSettingEnable
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
+import com.corner.util.settings.parseAsSettingEnable
 import com.corner.ui.scene.SnackBar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -2,6 +2,7 @@ package com.corner.ui.video
 
 import com.corner.catvodcore.viewmodel.SiteViewModel
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -38,8 +39,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
@@ -57,7 +56,7 @@ import com.corner.ui.nav.vm.VideoViewModel
 import com.corner.ui.scene.*
 import com.corner.util.spider.SpiderTestUtil
 import com.corner.util.isScrollingUp
-import com.corner.ui.components.AutoSizeImageWithLoading
+import com.corner.ui.scene.AutoSizeImageWithLoading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -65,6 +64,7 @@ import org.jetbrains.compose.resources.painterResource
 import lumentv_compose.composeapp.generated.resources.Res
 import lumentv_compose.composeapp.generated.resources.folder_back
 import lumentv_compose.composeapp.generated.resources.no_img
+
 @Composable
 fun VideoItem(
     modifier: Modifier,
@@ -205,143 +205,228 @@ fun WindowScope.VideoScene(
 
     var showChooseHome by remember { mutableStateOf(false) }
     var showFiltersDialog by remember { mutableStateOf(false) }
+    var showPlaywrightDownloadDialog by remember { mutableStateOf(false) }
+    var playwrightSpiderName by remember { mutableStateOf("") }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf(0f) }
 
-    Scaffold(
-        topBar = {
-            WindowDraggableArea {
-                VideoTopBar(
-                    vm = vm,
-                    onClickSearch = { onClickSwitch(Menu.SEARCH) },
-                    onClickChooseHome = { showChooseHome = !showChooseHome },
-                    onClickSetting = { onClickSwitch(Menu.SETTING) },
-                    onClickHistory = { onClickSwitch(Menu.HISTORY) })
-            }
-        },
-        floatingActionButton = {
-            FloatButton(vm, state, scope, showFiltersDialog) {
-                !showFiltersDialog
-            }
+    LaunchedEffect(model.value.showPlaywrightDownloadDialog) {
+        if (model.value.showPlaywrightDownloadDialog) {
+            showPlaywrightDownloadDialog = true
+            playwrightSpiderName = model.value.playwrightSpiderName
         }
-    ) {
-        Box(modifier = modifier.fillMaxSize().padding(it)) {
-            Column {
-                val classIsEmpty = derivedStateOf { model.value.classList.isNotEmpty() }
-                if (classIsEmpty.value) {
-                    ClassRow(vm) {
-                        vm.setClassData()
-                        scope.launch {
-                            state.animateScrollToItem(0)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                WindowDraggableArea {
+                    VideoTopBar(
+                        vm = vm,
+                        onClickSearch = { onClickSwitch(Menu.SEARCH) },
+                        onClickChooseHome = { showChooseHome = !showChooseHome },
+                        onClickSetting = { onClickSwitch(Menu.SETTING) },
+                        onClickHistory = { onClickSwitch(Menu.HISTORY) })
+                }
+            },
+            floatingActionButton = {
+                FloatButton(vm, state, scope, showFiltersDialog) {
+                    !showFiltersDialog
+                }
+            }
+        ) {
+            Box(modifier = modifier.fillMaxSize().padding(it)) {
+                Column {
+                    val classIsEmpty = derivedStateOf { model.value.classList.isNotEmpty() }
+                    if (classIsEmpty.value) {
+                        ClassRow(vm) {
+                            vm.setClassData()
+                            scope.launch {
+                                state.animateScrollToItem(0)
+                            }
                         }
                     }
-                }
-                val listEmpty = derivedStateOf { model.value.homeVodResult.isEmpty() }
-                val isInitialized by Init.isInitializedSuccessfully
-                //加载站源成功后，加载站源中的数据的状态
-                val isLoading by vm.isLoading
-                //加载配置文件时，调用了showProgress，通过监听showProgress的值来决定显示加载图标
-                val showProgress by GlobalAppState.showProgress.collectAsState()
-                if (!isInitialized) {
-                    emptyShow(
-                        onRefresh = { initConfig() },
-                        title = "初始化失败",
-                        subtitle = "请检查配置文件地址或重新加载配置",
-                        isLoading = showProgress
-                    )
-                }
-                if (listEmpty.value) {
-                    emptyShow(
-                        onRefresh = {
-                            vm.homeLoad(forceRefresh = true)
-                        },
-                        isLoading = isLoading
-                    )
-                } else {
-                    Box {
-                        LazyVerticalGrid(
-                            modifier = modifier.padding(15.dp),
-                            columns = GridCells.Adaptive(140.dp),
-                            contentPadding = PaddingValues(5.dp),
-                            state = state,
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            itemsIndexed(list.value, key = { i, item -> item.vodId + item.vodName + i }) { _, item ->
-                                VideoItem(Modifier.animateItem(), item, false) { vod ->
-                                    if (item.isFolder()) {
-                                        vm.clickFolder(vod)
-                                    } else {
-                                        onClickItem(vod)
+                    val listEmpty = derivedStateOf { model.value.homeVodResult.isEmpty() }
+                    val isInitialized by Init.isInitializedSuccessfully
+                    //加载站源成功后，加载站源中的数据的状态
+                    val isLoading by vm.isLoading
+                    //加载配置文件时，调用了showProgress，通过监听showProgress的值来决定显示加载图标
+                    val showProgress by GlobalAppState.showProgress.collectAsState()
+                    if (!isInitialized) {
+                        emptyShow(
+                            onRefresh = { initConfig() },
+                            title = "初始化失败",
+                            subtitle = "请检查配置文件地址或重新加载配置",
+                            isLoading = showProgress
+                        )
+                    }
+                    if (listEmpty.value) {
+                        emptyShow(
+                            onRefresh = {
+                                vm.homeLoad(forceRefresh = true)
+                            },
+                            isLoading = isLoading
+                        )
+                    } else {
+                        Box {
+                            LazyVerticalGrid(
+                                modifier = modifier.padding(15.dp),
+                                columns = GridCells.Adaptive(140.dp),
+                                contentPadding = PaddingValues(5.dp),
+                                state = state,
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                itemsIndexed(
+                                    list.value,
+                                    key = { i, item -> item.vodId + item.vodName + i }) { _, item ->
+                                    VideoItem(Modifier.animateItem(), item, false) { vod ->
+                                        if (item.isFolder()) {
+                                            vm.clickFolder(vod)
+                                        } else {
+                                            onClickItem(vod)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-            ChooseHomeDialog(vm, showChooseHome, onClose = { showChooseHome = false }) {
-                showChooseHome = false
-                vm.clear()
-                scope.launch {
-                    state.animateScrollToItem(0)
+                FiltersDialog(Modifier.align(Alignment.BottomCenter), showFiltersDialog, vm) {
+                    showFiltersDialog = false
                 }
-            }
-            FiltersDialog(Modifier.align(Alignment.BottomCenter), showFiltersDialog, vm) {
-                showFiltersDialog = false
-            }
-            val show = derivedStateOf {
-                model.value.dirPaths.size > 1
-            }
-            AnimatedVisibility(show.value) {
-                Box(Modifier.fillMaxSize()) {
-                    Surface(
-                        modifier = Modifier
-                            .wrapContentHeight()
-                            .wrapContentWidth()
-                            .align(Alignment.BottomStart)
-                            .padding(start = 16.dp, bottom = 16.dp) // 添加左边距16px和底边距16px
-                            .shadow(8.dp, shape = RoundedCornerShape(10.dp)),
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-                    ) {
-                        LazyRow(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), // 减少内边距使组件更紧凑
-                            horizontalArrangement = Arrangement.spacedBy(2.dp) // 减少间距使组件更紧凑
+                val show = derivedStateOf {
+                    model.value.dirPaths.size > 1
+                }
+                AnimatedVisibility(show.value) {
+                    Box(Modifier.fillMaxSize()) {
+                        Surface(
+                            modifier = Modifier
+                                .wrapContentHeight()
+                                .wrapContentWidth()
+                                .align(Alignment.BottomStart)
+                                .padding(start = 16.dp, bottom = 16.dp) // 添加左边距16px和底边距16px
+                                .shadow(8.dp, shape = RoundedCornerShape(10.dp)),
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
                         ) {
-                            itemsIndexed(model.value.dirPaths) { index, path ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    HoverableText(
-                                        text = path,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    ) {
-                                        SiteViewModel.viewModelScope.launch {
-                                            vm.clickFolder(
-                                                Vod(
-                                                    vodId = model.value.dirPaths.subList(
-                                                        0,
-                                                        index + 1
-                                                    ).joinToString("/")
+                            LazyRow(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), // 减少内边距使组件更紧凑
+                                horizontalArrangement = Arrangement.spacedBy(2.dp) // 减少间距使组件更紧凑
+                            ) {
+                                itemsIndexed(model.value.dirPaths) { index, path ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        HoverableText(
+                                            text = path,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        ) {
+                                            SiteViewModel.viewModelScope.launch {
+                                                vm.clickFolder(
+                                                    Vod(
+                                                        vodId = model.value.dirPaths.subList(
+                                                            0,
+                                                            index + 1
+                                                        ).joinToString("/")
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        if (index < model.value.dirPaths.size - 1) {
+                                            Text(
+                                                text = "/",
+                                                modifier = Modifier.padding(horizontal = 2.dp),
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                                 )
                                             )
                                         }
                                     }
-                                    if (index < model.value.dirPaths.size - 1) {
-                                        Text(
-                                            text = "/",
-                                            modifier = Modifier.padding(horizontal = 2.dp),
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                            )
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+
+        AnimatedVisibility(
+            visible = showChooseHome,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(150))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .zIndex(1f)
+            )
+        }
+        ChooseHomeDialog(
+            vm,
+            showChooseHome,
+            onClose = { showChooseHome = false }
+        ) {
+            showChooseHome = false
+            vm.clear()
+            scope.launch {
+                state.animateScrollToItem(0)
+            }
+        }
+        
+        // Playwright 浏览器下载对话框
+        if (showPlaywrightDownloadDialog) {
+            com.corner.ui.scene.PlaywrightDownloadDialog(
+                spiderName = playwrightSpiderName,
+                onConfirm = {
+                    // 开始下载，显示加载指示器
+                    isDownloading = true
+                    downloadProgress = 0f
+                    
+                    // 触发浏览器下载
+                    scope.launch {
+                        try {
+                            val result = com.corner.util.playwright.PlaywrightBrowserManager.ensureBrowserDownloaded(
+                                onProgress = { progress ->
+                                    // 更新进度
+                                    downloadProgress = progress.toFloat()
+                                }
+                            )
+                            
+                            if (result.isSuccess) {
+                                SnackBar.postMsg("浏览器下载成功，请重新加载站源", type = SnackBar.MessageType.SUCCESS)
+                                // 关闭对话框
+                                isDownloading = false
+                                showPlaywrightDownloadDialog = false
+                                // 重新加载主页
+                                vm.homeLoad(forceRefresh = true)
+                            } else {
+                                SnackBar.postMsg("浏览器下载失败: ${result.exceptionOrNull()?.message}", type = SnackBar.MessageType.ERROR)
+                                // 关闭对话框
+                                isDownloading = false
+                                showPlaywrightDownloadDialog = false
+                            }
+                        } catch (e: Exception) {
+                            SnackBar.postMsg("浏览器下载异常: ${e.message}", type = SnackBar.MessageType.ERROR)
+                            // 关闭对话框
+                            isDownloading = false
+                            showPlaywrightDownloadDialog = false
+                        }
+                    }
+                },
+                onCancel = {
+                    // 如果正在下载，不允许取消（或者可以实现中断下载）
+                    if (!isDownloading) {
+                        showPlaywrightDownloadDialog = false
+                        // 取消后重置 ViewModel 中的状态
+                        vm.state.value.copy(showPlaywrightDownloadDialog = false)
+                    }
+                },
+                isDownloading = isDownloading,
+                downloadProgress = downloadProgress
+            )
         }
     }
 }
@@ -746,9 +831,8 @@ fun ChooseHomeDialog(
     vm: VideoViewModel,
     showDialog: Boolean,
     onClose: () -> Unit,
-    onClick: (Site) -> Unit
+    onClick: (Site) -> Unit,
 ) {
-    var isClosing by remember { mutableStateOf(false) }
     val model = vm.state.collectAsState()
     val apiState = ApiConfig.apiFlow.collectAsState()
     val sites by derivedStateOf { apiState.value.sites.toList() }
@@ -757,275 +841,265 @@ fun ChooseHomeDialog(
     val spiderStatusMap by SpiderTestUtil.spiderStatusMapFlow.collectAsState()
     val testingSites by SpiderTestUtil.testingSites.collectAsState()
 
-    AnimatedVisibility(
-        visible = showDialog && !isClosing,
-        enter = EnterTransition.None, // 禁用进入动画
-        exit = ExitTransition.None    // 禁用退出动画
+    Dialog(
+        modifier = Modifier
+            .width(360.dp)
+            .heightIn(min = 200.dp, max = 500.dp)
+            .zIndex(10f),
+        showDialog = showDialog,
+        onClose = onClose,
+        enter = scaleIn(initialScale = 0.8f) + fadeIn(),
+        exit = scaleOut(targetScale = 0.8f) + fadeOut()
     ) {
-        Dialog(
-            onDismissRequest = onClose,
-            properties = DialogProperties(
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true,
-                usePlatformDefaultWidth = false // 禁用平台默认动画
-            ),
-        ) {
-            Surface(
+        Column {
+            // 标题和操作按钮
+            Row(
                 modifier = Modifier
-                    .width(360.dp)
-                    .heightIn(min = 200.dp, max = 500.dp),
-                shape = RoundedCornerShape(12.dp),
-                tonalElevation = 8.dp,
-                color = MaterialTheme.colorScheme.background
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    // 标题和操作按钮
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "选择首页站点",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                Text(
+                    text = "选择首页站点",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // 测试所有爬虫按钮
-                            IconButton(
-                                onClick = {
-                                    if (isTestingAll) {
-                                        SpiderTestUtil.cancelAllTests()
-                                        isTestingAll = false
-                                    } else {
-                                        isTestingAll = true
-                                        SpiderTestUtil.testAllSpiders { _, status ->
-                                            // 不再需要手动更新 spiderStatusMap，因为 SpiderTestUtil 会自动更新状态流
-                                            if (status != SpiderTestUtil.SpiderStatus.TESTING) {
-                                                val allCompleted =
-                                                    SpiderTestUtil.spiderStatusMap.values.none { it == SpiderTestUtil.SpiderStatus.TESTING }
-                                                if (allCompleted) {
-                                                    isTestingAll = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.PlayCircle,
-                                    contentDescription = if (isTestingAll) "停止测试" else "测试所有爬虫",
-                                    tint = if (isTestingAll) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            // 搜索模式切换
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "搜索模式",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Switch(
-                                    checked = enableAdvancedMode,
-                                    onCheckedChange = { SpiderTestUtil.setEnableAdvancedMode(it) }
-                                )
-                            }
-                        }
-                    }
-
-                    // 内容区域
-                    Box {
-                        val lazyListState = rememberLazyListState()
-                        LazyColumn(
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            state = lazyListState,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(items = sites) { item ->
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    tonalElevation = 1.dp,
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        // 站点按钮
-                                        OutlinedButton(
-                                            modifier = Modifier.weight(3f).padding(end = 8.dp),
-                                            onClick = {
-                                                SiteViewModel.viewModelScope.launch {
-                                                    ApiConfig.setHome(item)
-                                                    model.value.homeLoaded = false
-                                                    Db.Config.setHome(
-                                                        ApiConfig.api.url,
-                                                        ConfigType.SITE.ordinal,
-                                                        item.key
-                                                    )
-                                                }
-                                                onClick(item)
-                                            },
-                                            shape = RoundedCornerShape(6.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = MaterialTheme.colorScheme.primary
-                                            )
-                                        ) {
-                                            Text(
-                                                text = item.name,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.fillMaxWidth(),
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-
-                                        // 搜索开关
-                                        IconToggleButton(
-                                            checked = item.isSearchable(),
-                                            onCheckedChange = { newValue ->
-                                                // 通过 SpiderTestUtil 更新状态
-                                                SpiderTestUtil.updateSiteStatus(
-                                                    item.key,
-                                                    if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
-                                                )
-                                                // 然后更新数据源
-                                                vm.changeSite {
-                                                    item.searchable = if (newValue) 1 else 0
-                                                    return@changeSite item
-                                                }
-                                            },
-                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (item.isSearchable()) Icons.Default.Search else Icons.Default.SearchOff,
-                                                contentDescription = if (item.isSearchable()) "禁用搜索" else "启用搜索",
-                                                tint = if (item.isSearchable()) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        // 换源开关
-                                        IconToggleButton(
-                                            checked = item.isChangeable(),
-                                            onCheckedChange = { newValue ->
-                                                // 通过 SpiderTestUtil 更新状态
-                                                SpiderTestUtil.updateSiteStatus(
-                                                    item.key,
-                                                    if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
-                                                )
-                                                // 然后更新数据源
-                                                vm.changeSite {
-                                                    item.changeable = if (newValue) 1 else 0
-                                                    return@changeSite item
-                                                }
-                                            },
-                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (item.isChangeable()) Icons.Default.Sync else Icons.Default.SyncDisabled,
-                                                contentDescription = if (item.isChangeable()) "禁用换源" else "启用换源",
-                                                tint = if (item.isChangeable()) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        // 爬虫状态图标
-                                        val spiderStatus =
-                                            spiderStatusMap.getOrDefault(item.key, SpiderTestUtil.SpiderStatus.UNKNOWN)
-                                        if (spiderStatus != SpiderTestUtil.SpiderStatus.UNKNOWN) {
-                                            Icon(
-                                                imageVector = when (spiderStatus) {
-                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> Icons.Default.CheckCircle
-                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> Icons.Default.Error
-                                                    SpiderTestUtil.SpiderStatus.TESTING -> Icons.Default.Refresh
-                                                    else -> Icons.AutoMirrored.Filled.HelpOutline
-                                                },
-                                                contentDescription = when (spiderStatus) {
-                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> "可用"
-                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> "不可用"
-                                                    SpiderTestUtil.SpiderStatus.TESTING -> "测试中"
-                                                    else -> "未知"
-                                                },
-                                                tint = when (spiderStatus) {
-                                                    SpiderTestUtil.SpiderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
-                                                    SpiderTestUtil.SpiderStatus.UNAVAILABLE -> MaterialTheme.colorScheme.error
-                                                    SpiderTestUtil.SpiderStatus.TESTING -> MaterialTheme.colorScheme.tertiary
-                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                                modifier = Modifier
-                                                    .size(24.dp)
-                                                    .padding(horizontal = 4.dp)
-                                            )
-                                        }
-
-                                        // 单个测试按钮的 onClick 回调
-                                        IconButton(
-                                            onClick = {
-                                                SpiderTestUtil.updateSiteStatus(item.key, SpiderTestUtil.SpiderStatus.TESTING)
-
-                                                CoroutineScope(Dispatchers.IO).launch {
-                                                    SpiderTestUtil.testSpider(item.key) { siteKey, status ->
-                                                        // 通过 SpiderTestUtil 更新最终状态
-                                                        SpiderTestUtil.updateSiteStatus(siteKey, status)
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier.size(36.dp).padding(horizontal = 4.dp),
-                                            enabled = item.key !in testingSites
-                                        ) {
-                                            if (item.key in testingSites) {
-                                                // 显示加载图标
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(24.dp),
-                                                    strokeWidth = 2.dp,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                            } else {
-                                                // 显示测试图标
-                                                Icon(
-                                                    Icons.Default.SettingsRemote,
-                                                    contentDescription = "测试爬虫",
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                            }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 测试所有爬虫按钮
+                    IconButton(
+                        onClick = {
+                            if (isTestingAll) {
+                                SpiderTestUtil.cancelAllTests()
+                                isTestingAll = false
+                            } else {
+                                isTestingAll = true
+                                SpiderTestUtil.testAllSpiders { _, status ->
+                                    // 不再需要手动更新 spiderStatusMap，因为 SpiderTestUtil 会自动更新状态流
+                                    if (status != SpiderTestUtil.SpiderStatus.TESTING) {
+                                        val allCompleted =
+                                            SpiderTestUtil.spiderStatusMap.values.none { it == SpiderTestUtil.SpiderStatus.TESTING }
+                                        if (allCompleted) {
+                                            isTestingAll = false
                                         }
                                     }
                                 }
                             }
-                        }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PlayCircle,
+                            contentDescription = if (isTestingAll) "停止测试" else "测试所有爬虫",
+                            tint = if (isTestingAll) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                        )
+                    }
 
-                        // 滚动条
-                        VerticalScrollbar(
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp),
-                            adapter = rememberScrollbarAdapter(lazyListState),
-                            style = LocalScrollbarStyle.current.copy(
-                                unhoverColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                hoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                thickness = 6.dp
-                            )
+                    // 搜索模式切换
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "搜索模式",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Switch(
+                            checked = enableAdvancedMode,
+                            onCheckedChange = { SpiderTestUtil.setEnableAdvancedMode(it) }
                         )
                     }
                 }
+            }
+
+            // 内容区域
+            Box {
+                val lazyListState = rememberLazyListState()
+                LazyColumn(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    state = lazyListState,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(items = sites) { item ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            tonalElevation = 1.dp,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 站点按钮
+                                OutlinedButton(
+                                    modifier = Modifier.weight(3f).padding(end = 8.dp),
+                                    onClick = {
+                                        SiteViewModel.viewModelScope.launch {
+                                            ApiConfig.setHome(item)
+                                            model.value.homeLoaded = false
+                                            Db.Config.setHome(
+                                                ApiConfig.api.url,
+                                                ConfigType.SITE.ordinal,
+                                                item.key
+                                            )
+                                        }
+                                        onClick(item)
+                                    },
+                                    shape = RoundedCornerShape(6.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+
+                                // 搜索开关
+                                IconToggleButton(
+                                    checked = item.isSearchable(),
+                                    onCheckedChange = { newValue ->
+                                        // 通过 SpiderTestUtil 更新状态
+                                        SpiderTestUtil.updateSiteStatus(
+                                            item.key,
+                                            if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
+                                        )
+                                        // 然后更新数据源
+                                        vm.changeSite {
+                                            item.searchable = if (newValue) 1 else 0
+                                            return@changeSite item
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (item.isSearchable()) Icons.Default.Search else Icons.Default.SearchOff,
+                                        contentDescription = if (item.isSearchable()) "禁用搜索" else "启用搜索",
+                                        tint = if (item.isSearchable()) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // 换源开关
+                                IconToggleButton(
+                                    checked = item.isChangeable(),
+                                    onCheckedChange = { newValue ->
+                                        // 通过 SpiderTestUtil 更新状态
+                                        SpiderTestUtil.updateSiteStatus(
+                                            item.key,
+                                            if (newValue) SpiderTestUtil.SpiderStatus.AVAILABLE else SpiderTestUtil.SpiderStatus.UNAVAILABLE
+                                        )
+                                        // 然后更新数据源
+                                        vm.changeSite {
+                                            item.changeable = if (newValue) 1 else 0
+                                            return@changeSite item
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp).padding(horizontal = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (item.isChangeable()) Icons.Default.Sync else Icons.Default.SyncDisabled,
+                                        contentDescription = if (item.isChangeable()) "禁用换源" else "启用换源",
+                                        tint = if (item.isChangeable()) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // 爬虫状态图标
+                                val spiderStatus =
+                                    spiderStatusMap.getOrDefault(item.key, SpiderTestUtil.SpiderStatus.UNKNOWN)
+                                if (spiderStatus != SpiderTestUtil.SpiderStatus.UNKNOWN) {
+                                    Icon(
+                                        imageVector = when (spiderStatus) {
+                                            SpiderTestUtil.SpiderStatus.AVAILABLE -> Icons.Default.CheckCircle
+                                            SpiderTestUtil.SpiderStatus.UNAVAILABLE -> Icons.Default.Error
+                                            SpiderTestUtil.SpiderStatus.TESTING -> Icons.Default.Refresh
+                                            else -> Icons.AutoMirrored.Filled.HelpOutline
+                                        },
+                                        contentDescription = when (spiderStatus) {
+                                            SpiderTestUtil.SpiderStatus.AVAILABLE -> "可用"
+                                            SpiderTestUtil.SpiderStatus.UNAVAILABLE -> "不可用"
+                                            SpiderTestUtil.SpiderStatus.TESTING -> "测试中"
+                                            else -> "未知"
+                                        },
+                                        tint = when (spiderStatus) {
+                                            SpiderTestUtil.SpiderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
+                                            SpiderTestUtil.SpiderStatus.UNAVAILABLE -> MaterialTheme.colorScheme.error
+                                            SpiderTestUtil.SpiderStatus.TESTING -> MaterialTheme.colorScheme.tertiary
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .padding(horizontal = 4.dp)
+                                    )
+                                }
+
+                                // 单个测试按钮的 onClick 回调
+                                IconButton(
+                                    onClick = {
+                                        SpiderTestUtil.updateSiteStatus(
+                                            item.key,
+                                            SpiderTestUtil.SpiderStatus.TESTING
+                                        )
+
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            SpiderTestUtil.testSpider(item.key) { siteKey, status ->
+                                                // 通过 SpiderTestUtil 更新最终状态
+                                                SpiderTestUtil.updateSiteStatus(siteKey, status)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp).padding(horizontal = 4.dp),
+                                    enabled = item.key !in testingSites
+                                ) {
+                                    if (item.key in testingSites) {
+                                        // 显示加载图标
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else {
+                                        // 显示测试图标
+                                        Icon(
+                                            Icons.Default.SettingsRemote,
+                                            contentDescription = "测试爬虫",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 滚动条
+                VerticalScrollbar(
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp),
+                    adapter = rememberScrollbarAdapter(lazyListState),
+                    style = LocalScrollbarStyle.current.copy(
+                        unhoverColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        hoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        thickness = 6.dp
+                    )
+                )
             }
         }
     }

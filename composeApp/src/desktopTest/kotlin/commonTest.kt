@@ -1,9 +1,9 @@
 import cn.hutool.system.SystemUtil
 import com.corner.util.json.Jsons
-import com.corner.util.net.Urls
+import com.corner.util.io.Urls
 import com.corner.util.net.Utils
 import com.corner.server.KtorD
-import com.corner.util.network.KtorClient
+import com.corner.util.net.KtorClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

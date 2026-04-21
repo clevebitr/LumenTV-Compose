@@ -1,9 +1,10 @@
-package com.corner.bean
+package com.corner.util
 
 import com.corner.catvodcore.viewmodel.SiteViewModel
 import com.corner.util.net.Http
 import com.corner.util.json.Jsons
 import com.corner.catvodcore.viewmodel.GlobalAppState
+import com.corner.ui.scene.SnackBar
 import io.ktor.http.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -11,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.decodeFromStream
 import okhttp3.Headers.Companion.toHeaders
 import org.slf4j.LoggerFactory
+import java.net.ConnectException
 
 private val log = LoggerFactory.getLogger("Hot")
 
@@ -34,11 +36,11 @@ data class Hot(val data: List<HotData>) {
                             ).data
                         }
                     }
-                } catch (e: java.net.ConnectException) {
+                } catch (e: ConnectException) {
                     log.error("请求热搜失败：网络连接错误", e)
-                    com.corner.ui.scene.SnackBar.postMsg(
+                    SnackBar.postMsg(
                         "热搜加载失败：无法连接到网络\n请检查代理设置或网络连接",
-                        type = com.corner.ui.scene.SnackBar.MessageType.WARNING
+                        type = SnackBar.MessageType.WARNING
                     )
                 } catch (e: Exception) {
                     log.error("请求热搜失败", e)

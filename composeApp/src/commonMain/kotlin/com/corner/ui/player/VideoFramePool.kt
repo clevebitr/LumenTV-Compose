@@ -8,11 +8,20 @@ import java.util.concurrent.LinkedBlockingDeque
 
 private val log = LoggerFactory.getLogger("BitmapPool")
 
-class BitmapPool(private var maxPoolSize: Int = 3) {
+/**
+ * Bitmap 对象池
+ * 
+ * 负责管理 Bitmap 对象的复用和回收
+ * 实现 AutoCloseable 接口，确保资源能够被正确清理
+ */
+class BitmapPool(private var maxPoolSize: Int = 3) : AutoCloseable {
     private val pool = LinkedBlockingDeque<Bitmap>()
 
     @Volatile
     private var createdCount = 0
+    
+    @Volatile
+    private var isClosed = false
 
     fun setMaxSize(size: Int) {
         maxPoolSize = size
@@ -63,10 +72,42 @@ class BitmapPool(private var maxPoolSize: Int = 3) {
             }
         }
     }
-
-
+    /**
+     * 清空池中所有 Bitmap 并释放资源
+     */
     fun clear() {
-        pool.forEach { it.close() }
-        pool.clear()
+        if (isClosed) return
+        
+        synchronized(this) {
+            pool.forEach { 
+                if (!it.isClosed) it.close() 
+            }
+            pool.clear()
+            log.debug("BitmapPool 已清空，共清理 ${pool.size} 个 Bitmap")
+        }
+    }
+    
+    /**
+     * 关闭 BitmapPool，释放所有资源
+     * 实现 AutoCloseable 接口，支持 use 块自动清理
+     */
+    override fun close() {
+        if (isClosed) {
+            log.debug("BitmapPool 已关闭，跳过重复关闭")
+            return
+        }
+        
+        synchronized(this) {
+            if (isClosed) return
+            isClosed = true
+            
+            try {
+                log.debug("=====开始关闭 BitmapPool=====")
+                clear()
+                log.debug("=====BitmapPool 已关闭=====")
+            } catch (e: Exception) {
+                log.error("关闭 BitmapPool 时出错", e)
+            }
+        }
     }
 }

@@ -30,21 +30,32 @@ class InniePlayerStrategy(
         onError: (String) -> Unit
     ) {
         try {
-            // 更新播放状态
-            updatePlaybackState(result)
-            
-            // 加载媒体URL
+            // 1. 确保播放器已初始化（从 Idle 状态转换）
+            if (lifecycleManager.lifecycleState.value == Idle) {
+                log.debug("<Innie> 播放器未初始化，开始初始化...")
+                val initResult = lifecycleManager.initializeSync()
+                if (initResult.isFailure) {
+                    onError("播放器初始化失败: ${initResult.exceptionOrNull()?.message}")
+                    return
+                }
+            }
+                
+            // 2. 准备播放器（转换到 Ready 状态）
+            val prepareResult = lifecycleManager.prepareForPlayback()
+            if (prepareResult.isFailure) {
+                onError("播放器准备失败: ${prepareResult.exceptionOrNull()?.message}")
+                return
+            }
+                
+            // 3. 加载媒体 URL
             val loadSuccess = loadMediaUrl(result, onError)
             if (!loadSuccess) {
                 return
             }
-            
-            // 准备播放器
-            prepareForPlayback(result, onError)
-            
-            // 启动播放并等待真正开始播放
+                
+            // 4. 启动播放并等待真正开始播放
             waitForPlaybackToStart(onPlayStarted, onError)
-            
+                
         } catch (e: Exception) {
             log.error("内部播放器播放失败", e)
             onError("播放器初始化失败: ${e.message}")
@@ -54,95 +65,22 @@ class InniePlayerStrategy(
     override fun getStrategyName(): String = "InniePlayer"
     
     /**
-     * 更新播放状态
-     */
-    private fun updatePlaybackState(result: Result) {
-        log.debug("更新播放状态: URL={}", result.url.v())
-    }
-    
-    /**
      * 加载媒体URL到播放器
      */
     private suspend fun loadMediaUrl(result: Result, onError: (String) -> Unit): Boolean {
-        return try {
-            val url = result.url.v()
-            controller.loadURL(url, 5000) // 5秒超时
-            true
-        } catch (e: Exception) {
-            log.error("加载媒体URL失败", e)
-            onError("加载媒体失败: ${e.message}")
-            false
-        }
-    }
-    
-    /**
-     * 准备播放器：确保播放器处于Ready状态
-     */
-    private suspend fun prepareForPlayback(result: Result, onError: (String) -> Unit) {
-        val success = when (lifecycleManager.lifecycleState.value) {
-            Ready -> return // 已经是Ready状态，可以直接播放
-            Playing -> transitionFromPlayingToReady()
-            Loading, Ended, Ended_Async -> lifecycleManager.ready().isSuccess
-            Error -> recoverFromErrorState(onError)
-            else -> transitionFromOtherStatesToReady()
+        val loadResult = PlayerOperationUtils.safeExecute(
+            operationName = "加载媒体URL",
+            timeoutMillis = PlayerStrategyConfig.INNIE_LOAD_URL_TIMEOUT_MS
+        ) {
+            controller.loadURL(result.url.v(), PlayerStrategyConfig.INNIE_LOAD_URL_TIMEOUT_MS)
         }
         
-        if (!success) {
-            onError("播放器状态错误，无法准备播放")
-        }
-    }
-    
-    /**
-     * 从Playing状态转换到Ready
-     */
-    private suspend fun transitionFromPlayingToReady(): Boolean {
-        return lifecycleManager.stop().isSuccess &&
-                lifecycleManager.ended().isSuccess &&
-                lifecycleManager.ready().isSuccess
-    }
-    
-    /**
-     * 从Error状态恢复
-     */
-    private suspend fun recoverFromErrorState(onError: (String) -> Unit): Boolean {
-        return try {
-            val cleanupSuccess = lifecycleManager.cleanup().isSuccess
-            if (!cleanupSuccess) {
-                log.warn("清理资源失败")
-            }
-            
-            val initSuccess = lifecycleManager.initializeSync().isSuccess
-            if (!initSuccess) {
-                onError("重新初始化失败")
-                return false
-            }
-            
-            val loadingSuccess = lifecycleManager.loading().isSuccess
-            if (!loadingSuccess) {
-                onError("播放器加载失败")
-                return false
-            }
-            
-            val readySuccess = lifecycleManager.ready().isSuccess
-            if (!readySuccess) {
-                onError("播放器准备就绪失败")
-                return false
-            }
-            
-            true
-        } catch (e: Exception) {
-            log.error("错误状态恢复过程中发生异常", e)
-            onError("错误状态恢复失败: ${e.message}")
+        return if (loadResult.isFailure) {
+            onError("加载媒体失败: ${loadResult.exceptionOrNull()?.message}")
             false
+        } else {
+            true
         }
-    }
-    
-    /**
-     * 从其他状态转换到Ready
-     */
-    private suspend fun transitionFromOtherStatesToReady(): Boolean {
-        return lifecycleManager.ended().isSuccess &&
-                lifecycleManager.ready().isSuccess
     }
     
     /**
@@ -155,12 +93,13 @@ class InniePlayerStrategy(
         val startTime = System.currentTimeMillis()
         
         try {
-            withTimeout(30000) {
+            // 不使用 safeExecute，因为 PlayStartedException 是控制流异常
+            withTimeout(PlayerStrategyConfig.INNIE_PLAYBACK_START_TIMEOUT_MS) {
                 transitionToPlayingState(onError)
                 waitForControllerPlayState(onPlayStarted)
             }
         } catch (e: PlayStartedException) {
-            // 正常控制流异常，用于跳出collect
+            // 正常控制流异常，用于跳出collect，无需处理
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             val elapsed = System.currentTimeMillis() - startTime
             log.warn("⚠️ 播放器加载超时 (耗时: {}ms)", elapsed)
@@ -188,7 +127,7 @@ class InniePlayerStrategy(
                 onPlayStarted()
                 throw PlayStartedException() // 使用异常跳出collect
             } else if (playerState.state == com.corner.ui.player.PlayState.BUFFERING && 
-                       playerState.bufferProgression >= 100f) {
+                       playerState.bufferProgression >= PlayerStrategyConfig.INNIE_BUFFER_COMPLETE_THRESHOLD) {
                 onPlayStarted()
                 throw PlayStartedException()
             }

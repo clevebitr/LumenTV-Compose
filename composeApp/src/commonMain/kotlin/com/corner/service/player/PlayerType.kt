@@ -1,5 +1,4 @@
-package com.corner.bean.enums
-
+package com.corner.service.player
 
 enum class PlayerType(
     val display: String,

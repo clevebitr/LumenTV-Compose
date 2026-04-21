@@ -99,8 +99,8 @@ kotlin {
                 implementation(libs.jupnp.support)
                 implementation(libs.jupnp.osgi)
 
-                // WebSocket
-                implementation(libs.java.websocket)
+                // Playwright for WAF bypass (used by some spiders like ChangZhang)
+                implementation(libs.playwright)
 
                 // Coroutines
                 implementation(libs.kotlinx.coroutines.swing)
@@ -112,6 +112,10 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 // Player
                 implementation(libs.vlcj)
+                // ImageIO Decoder for WebP support
+                implementation(libs.image.loader.extension.imageio)
+                // TwelveMonkeys ImageIO plugin for WebP support (Java 8+)
+                implementation(libs.twelvemonkeys.webp)
             }
         }
     }
@@ -172,6 +176,9 @@ compose.desktop {
 
         jvmArgs("-Dfile.encoding=UTF-8")
         jvmArgs("-Dsun.net.http.allowRestrictedHeaders=true")
+        // Note: --enable-native-access is only needed for NightMonkeys (AVIF/HEIF support)
+        // Uncomment if you enable AVIF/HEIF support
+        // jvmArgs("--enable-native-access=ALL-UNNAMED")
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
@@ -185,7 +192,8 @@ compose.desktop {
                 "jdk.unsupported",
                 "java.naming",
                 "java.base",
-                "java.sql"
+                "java.sql",
+                "jdk.zipfs"  // JAR 文件系统支持（Playwright 需要）
             )
             val dir = project.layout.projectDirectory.dir("src/desktopMain/appResources")
             println(dir)

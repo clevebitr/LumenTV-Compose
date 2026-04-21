@@ -1,6 +1,6 @@
 package com.corner.util.update
 
-import com.corner.util.network.KtorClient
+import com.corner.util.net.KtorClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 

@@ -54,6 +54,29 @@
 }
 -keep class org.jupnp.** { *; }
 
+# DLNA
+-keep class org.jupnp.** { *; }
+-keep interface org.jupnp.** { *; }
+-keepclassmembers class org.jupnp.** {
+    public <methods>;
+    private <methods>;
+}
+
+# XML
+-keep class javax.xml.parsers.** { *; }
+-keep interface javax.xml.parsers.** { *; }
+-keep class org.w3c.dom.** { *; }
+-keep interface org.w3c.dom.** { *; }
+-keep class org.xml.sax.** { *; }
+-dontwarn javax.xml.parsers.**
+-dontwarn org.w3c.dom.**
+-dontwarn org.xml.sax.**
+
+# DocumentBuilder
+-keepclassmembers class javax.xml.parsers.DocumentBuilder {
+    public org.w3c.dom.Document parse(...);
+}
+
 # 日志框架（项目使用 Log4j2）
 -keep class org.apache.logging.log4j.** { *; }
 -keep class org.slf4j.** { *; }

@@ -161,23 +161,17 @@ jobs:
       - name: 📝 Generate version.json
         run: |
           echo "📝 生成版本信息文件"
-          cat > ./release-files/version.json << EOF
-{
-  "version": "${{ needs.set-tag.outputs.tag }}",
-  "windows": {
-    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip",
-    "msi_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi"
-  },
-  "linux": {
-    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip",
-    "deb_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb"
-  },
-  "mac": {
-    "download_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip",
-    "dmg_url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
-  }
-}
-EOF
+          VERSION="${{ needs.set-tag.outputs.tag }}"
+          REPO="${{ github.repository }}"
+          printf '{\n  "version": "%s",\n  "windows": {\n    "download_url": "https://github.com/%s/releases/download/%s/LumenTV-win-%s.zip",\n    "msi_url": "https://github.com/%s/releases/download/%s/LumenTV-win-%s.msi"\n  },\n  "linux": {\n    "download_url": "https://github.com/%s/releases/download/%s/LumenTV-linux-%s.zip",\n    "deb_url": "https://github.com/%s/releases/download/%s/LumenTV-linux-%s.deb"\n  },\n  "mac": {\n    "download_url": "https://github.com/%s/releases/download/%s/LumenTV-mac-%s.zip",\n    "dmg_url": "https://github.com/%s/releases/download/%s/LumenTV-mac-%s.dmg"\n  }\n}\n' \
+            "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            "$REPO" "$VERSION" "$VERSION" \
+            > ./release-files/version.json
 
       - name: 📖 Extract changelog for current version
         id: changelog

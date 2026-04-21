@@ -2,10 +2,12 @@ package com.corner.catvodcore.loader
 
 import com.corner.catvodcore.Constant
 import com.corner.catvodcore.config.ApiConfig
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.ui.scene.SnackBar
 import com.corner.util.net.Http
 import com.corner.util.io.Paths
-import com.corner.util.net.Urls
+import com.corner.util.io.Urls
 import com.corner.util.net.Utils
 import com.corner.util.thisLogger
 import com.github.catvod.crawler.Spider
@@ -79,8 +81,8 @@ object JarLoader {
                 val texts = currentSpider.split(Constant.MD5_SPLIT)
                 val md5 = if (texts.size <= 1) "" else texts[1].trim()
                 val jar = texts[0]
-                log.debug("<loadJar>md5 is {}", md5)
-                log.debug("<loadJar>texts is {}", texts)
+                log.debug("md5 is {}", md5)
+                log.debug("texts is {}", texts)
                 when {
                     md5.isNotEmpty() && Utils.equals(parseJarUrl(jar), md5) -> {
                         log.info("md5校验成功，以md5方式加载...")
@@ -215,16 +217,25 @@ object JarLoader {
         } catch (e: ClassNotFoundException) {
             log.debug("Spider类不存在: {}, api: {}", e.message, api)
             return Spider()
+        } catch (e: IllegalStateException) {
+            if (e.message?.contains("Playwright", ignoreCase = true) == true) {
+                log.warn("Playwright 浏览器未安装: key={}, api={}", key, api)
+                throw e
+            }
+            log.error("加载Spider失败(IllegalStateException): key={}, api={}", key, api, e)
+            return Spider()
         } catch (e: java.net.ConnectException) {
             // 网络连接错误，通常是代理问题
             log.error("加载Spider时网络连接失败: key={}, api={}", key, api, e)
             SnackBar.postMsg(
-                "爬虫加载失败：无法连接到网络\n\n可能原因：\n1. 代理服务器未启动（当前配置: ${com.corner.bean.SettingStore.getSettingItem(com.corner.bean.SettingType.PROXY)}）\n2. 网络连接异常\n3. 目标服务器不可达\n\n建议：检查代理设置或关闭代理后重试",
+                "爬虫加载失败：无法连接到网络\n\n可能原因：\n1. 代理服务器未启动（当前配置: ${
+                    SettingStore.getSettingItem(
+                        SettingType.PROXY)}）\n2. 网络连接异常\n3. 目标服务器不可达\n\n建议：检查代理设置或关闭代理后重试",
                 type = SnackBar.MessageType.ERROR
             )
             return Spider()
         } catch (e: IllegalArgumentException) {
-            // URL 格式错误（如端口为 -1），通常是代理配置问题
+            // URL 格式错误
             log.error("加载Spider时URL格式错误: key={}, api={}, 错误: {}", key, api, e.message, e)
             SnackBar.postMsg(
                 "爬虫加载失败：URL格式错误\n\n错误信息: ${e.message}\n\n可能原因：\n1. 代理配置不正确\n2. Spider内部生成的URL无效\n\n建议：关闭代理后重试，或联系开发者修复Spider",

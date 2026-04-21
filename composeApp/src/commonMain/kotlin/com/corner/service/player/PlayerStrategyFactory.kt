@@ -1,6 +1,6 @@
 package com.corner.service.player
 
-import com.corner.bean.enums.PlayerType
+import com.corner.service.player.PlayerType
 import com.corner.ui.player.PlayerLifecycleManager
 import com.corner.ui.player.vlcj.VlcjFrameController
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +10,21 @@ import kotlinx.coroutines.CoroutineScope
  * 
  * 根据播放器类型创建对应的策略实例
  * 遵循工厂模式，封装策略对象的创建逻辑
+ * 
+ * 使用示例：
+ * ```kotlin
+ * // 方式1: 通过播放器类型创建（推荐）
+ * val strategy = PlayerStrategyFactory.createStrategy(
+ *     playerType = PlayerType.Outie.id,
+ *     controller = controller,      // Innie需要
+ *     lifecycleManager = manager,   // Innie需要
+ *     viewModelScope = scope        // Innie需要
+ * )
+ * strategy.play(result, episode, onPlayStarted = {}, onError = {})
+ * 
+ * // 方式2: 获取策略名称（用于日志）
+ * val name = PlayerStrategyFactory.getStrategyName(PlayerType.Web.id)
+ * ```
  */
 object PlayerStrategyFactory {
     

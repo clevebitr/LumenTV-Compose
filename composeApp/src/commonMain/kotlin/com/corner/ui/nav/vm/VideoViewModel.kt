@@ -149,9 +149,25 @@ class VideoViewModel : BaseViewModel() {
                         }
                     }
                 }
+            } catch (e: IllegalStateException) {
+                if (e.message?.contains("Playwright", ignoreCase = true) == true) {
+                    hideProgress()
+                    isLoading.value = false
+                    _state.value.homeLoaded = false
+                    // 更新状态以显示下载对话框
+                    _state.update {
+                        it.copy(
+                            showPlaywrightDownloadDialog = true,
+                            playwrightSpiderName = home.value.name ?: "当前站源"
+                        )
+                    }
+                    return@launch
+                }
+                log.error("加载失败(IllegalStateException)", e)
+                _state.value.homeLoaded = false
             } catch (e: Exception) {
                 log.error("加载失败", e)
-                _state.value.homeLoaded = false // 失败时重置状态
+                _state.value.homeLoaded = false
             } finally {
                 hideProgress()
                 isLoading.value = false

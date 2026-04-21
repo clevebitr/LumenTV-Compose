@@ -42,7 +42,8 @@ fun RatioBtn(
     selected: Boolean,
     loading: Boolean = false,
     tag: () -> Pair<Boolean, String> = { false to "" },
-    enableTooltip: Boolean = true
+    enableTooltip: Boolean = true,
+    trailingContent: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -145,6 +146,10 @@ fun RatioBtn(
                                 maxLines = 1
                             )
                         }
+                    }
+
+                    if (trailingContent != null) {
+                        trailingContent()
                     }
                 }
             }

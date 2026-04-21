@@ -72,7 +72,7 @@ object Utils {
             if (webHttpHeaderMap.isEmpty()) {
                 webHttpHeaderMap = HashMap<String, String>()
                 webHttpHeaderMap[org.apache.http.HttpHeaders.CONNECTION] = "keep-alive"
-                webHttpHeaderMap[org.apache.http.HttpHeaders.USER_AGENT] = Constants.ChromeUserAgent
+                webHttpHeaderMap[org.apache.http.HttpHeaders.USER_AGENT] = Constants.CHROME_UA
                 webHttpHeaderMap[org.apache.http.HttpHeaders.ACCEPT] = "*/*"
             }
         }
@@ -146,33 +146,36 @@ object Utils {
     }
 
     fun printSystemInfo() {
-        val s = StringBuilder("\n")
+        // 只在控制台输出 Logo
         val logo = """
             __                                  _______    __
            / /   __  ______ ___  ___  ____     /_  __/ |  / /
           / /   / / / / __ `__ \/ _ \/ __ \     / /  | | / / 
          / /___/ /_/ / / / / / /  __/ / / /    / /   | |/ /  
         /_____/\__,_/_/ /_/ /_/\___/_/ /_/    /_/    |___/  
-    """.trimIndent()
+        """.trimIndent()
+        println(logo)
 
-        getSystemPropAndAppend("java.version", s)
-        getSystemPropAndAppend("java.home", s)
-        getSystemPropAndAppend("os.name", s)
-        getSystemPropAndAppend("os.arch", s)
-        getSystemPropAndAppend("os.version", s)
-        getSystemPropAndAppend("user.dir", s)
-        getSystemPropAndAppend("user.home", s)
+        // 收集系统信息
+        val systemInfo = mutableListOf<String>()
+        getSystemPropAndAppend("java.vendor", systemInfo)
+        getSystemPropAndAppend("java.version", systemInfo)
+        getSystemPropAndAppend("java.home", systemInfo)
+        getSystemPropAndAppend("os.name", systemInfo)
+        getSystemPropAndAppend("os.arch", systemInfo)
+        getSystemPropAndAppend("os.version", systemInfo)
+        getSystemPropAndAppend("user.dir", systemInfo)
+        getSystemPropAndAppend("user.home", systemInfo)
 
-        val yellowBolo = "\u001b[33;1m"     // 33=黄色, 1=加粗
-        val reset = "\u001b[0m"             // 重置颜色
-
-        log.info("{}\n{}\n系统信息：{}{}", yellowBolo, logo, s.toString(), reset)
+        log.info("")  // 日志文件空行，便于区分新旧日志
+        log.info("------------------App Start---------------------")
+        log.info("系统信息: {}", systemInfo.joinToString(" | "))
     }
 
-    private fun getSystemPropAndAppend(key: String, s: StringBuilder) {
+    private fun getSystemPropAndAppend(key: String, list: MutableList<String>) {
         val v = SystemPropsUtil.get(key)
         if (v.isNotBlank()) {
-            s.append(key).append(":").append(v).append("\n")
+            list.add("$key=$v")
         }
     }
 }

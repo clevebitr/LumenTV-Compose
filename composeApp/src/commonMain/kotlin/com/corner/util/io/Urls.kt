@@ -1,4 +1,4 @@
-package com.corner.util.net
+package com.corner.util.io
 
 import com.corner.util.core.thisLogger
 import java.net.URI

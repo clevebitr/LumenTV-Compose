@@ -25,7 +25,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import okhttp3.Call
 import okhttp3.Headers.Companion.toHeaders
-import okhttp3.Response
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -34,18 +33,18 @@ import com.corner.ui.nav.data.DialogState
 import com.corner.ui.nav.data.DialogState.changeDialogState
 import com.corner.ui.nav.data.ViewModelState
 import com.corner.ui.scene.SnackBar
-import com.corner.util.Constants
+import com.corner.util.core.Constants
 import com.corner.util.m3u8.M3U8AdFilterInterceptor
 import com.corner.util.m3u8.M3U8Cache
+import com.corner.util.net.createDefaultOkHttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URI
 
-object SiteViewModel {
-    private val log = LoggerFactory.getLogger("SiteViewModel")
+private val log = LoggerFactory.getLogger("SiteViewModel")
 
+object SiteViewModel {
     private val _state = MutableStateFlow(ViewModelState())
     val state: MutableStateFlow<ViewModelState> = _state
     val result: MutableState<Result> by lazy { mutableStateOf(Result()) }
@@ -108,6 +107,12 @@ object SiteViewModel {
                     fetchPic(site, Jsons.decodeFromString<Result>(homeContent)).also { result.value = it }
                 }
             }
+        } catch (e: IllegalStateException) {
+            if (e.message?.contains("Playwright", ignoreCase = true) == true) {
+                throw e
+            }
+            log.error("home Content site:{}", site.name, e)
+            return Result(false)
         } catch (e: Exception) {
             log.error("home Content site:{}", site.name, e)
             return Result(false)
@@ -227,7 +232,13 @@ object SiteViewModel {
         val urlType = Url(id).parameters["type"]
         if (urlType == "json" && StringUtils.isNotBlank(id)) {
             // 请求并解析JSON类型的真实链接
-            val responseBody = Http.newCall(id, site.header.toHeaders()).execute().body.string()
+            val responseBody = Http.newCall(id, site.header.toHeaders()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    log.error("获取JSON链接失败，状态码: ${response.code}")
+                    return@use ""
+                }
+                response.body.string()
+            }
             if (StringUtils.isNotBlank(responseBody)) {
                 url = Jsons.decodeFromString<Result>(responseBody).url
             }
@@ -252,10 +263,37 @@ object SiteViewModel {
         val urlStr = result.url.v()
         if (urlStr.isBlank()) return // URL为空直接跳过
 
+        // 0. 检测并处理磁力链接
+        if (com.corner.util.net.Utils.isDownloadLink(urlStr)) {
+            log.debug("发现磁力链接: $urlStr")
+            // 根据用户选择更新状态
+            if (!DialogState.userChoseOpenInBrowser) {
+                DialogState.showPngDialog(urlStr)
+                changeDialogState(true)
+            } else {
+                changeDialogState(false)
+            }
+            _state.update { it.copy(isSpecialVideoLink = true) }
+            return // 磁力链接无需后续处理
+        }
+
+        // 0.5. 处理需要解析的加密 URL（parse == 1）
+        if (result.parse == 1 && result.key != null) {
+            log.debug("检测到需要解析的 URL (parse=1): $urlStr")
+            // 将加密 URL 转换为本地代理 URL，由 Spider 的 proxyLocal 方法解密
+            val proxyUrl = "http://127.0.0.1:${com.corner.server.KtorD.getPort()}/proxy?do=${result.key}&url=${java.net.URLEncoder.encode(urlStr, "UTF-8")}"
+            result.url = Url().add(proxyUrl)
+            result.parse = 0 // 已转换为代理 URL，无需再次解析
+            log.debug("转换为代理 URL: $proxyUrl")
+            return // 代理 URL 无需后续处理
+        }
+
         // 1. 检测并处理「包含.m3u8但不以.m3u8结尾」的特殊链接
+        // 注意：需要先去除查询参数再判断，避免将带参数的正常 m3u8 URL 误判为特殊链接
+        val urlWithoutQuery = urlStr.split("?").firstOrNull() ?: urlStr
         val isSpecialLink = !urlStr.contains("proxy")
                 && urlStr.contains(".m3u8", ignoreCase = true)
-                && !urlStr.trim().endsWith(".m3u8", ignoreCase = true)
+                && !urlWithoutQuery.trim().endsWith(".m3u8", ignoreCase = true)
 
         if (isSpecialLink) {
             log.debug("发现特殊链接(包含.m3u8但不以.m3u8结尾): $urlStr")
@@ -273,7 +311,7 @@ object SiteViewModel {
         }
 
         // 2. 处理「标准M3U8链接」（以.m3u8结尾、不含proxy）
-        val isStandardM3u8 = urlStr.endsWith(".m3u8") && !urlStr.contains("proxy")
+        val isStandardM3u8 = urlWithoutQuery.endsWith(".m3u8", ignoreCase = true) && !urlStr.contains("proxy")
         if (isStandardM3u8) {
             result.url = processM3U8(result.url)
             log.debug("Processed standard M3U8 link: $urlStr")
@@ -302,7 +340,7 @@ object SiteViewModel {
             val interceptor = M3U8AdFilterInterceptor.Interceptor()
 
             // 创建OkHttpClient并添加拦截器，使用统一的代理配置
-            val client = com.corner.util.network.createDefaultOkHttpClient()
+            val client = createDefaultOkHttpClient()
                 .newBuilder()
                 .addInterceptor(interceptor)
                 .build()
@@ -361,15 +399,19 @@ object SiteViewModel {
             }
 
             // 3. 处理嵌套M3U8
-            val processedContent = Regex("(?m)^(?!#).*\\.m3u8$").replace(processedKeyContent) { match ->
+            val processedNestedContent = Regex("(?m)^(?!#).*\\.m3u8$").replace(processedKeyContent) { match ->
                 val nestedUrl = match.value.let {
                     if (it.startsWith("http")) it else "${url.v().substringBeforeLast("/")}/$it"
                 }
                 processM3U8(Url().add(nestedUrl), false).v() // 递归处理
             }
 
+            // 4. 将相对路径的 .ts 片段转换为完整 URL（不代理，让 HLS.js 直接访问）
+            val processedTsContent = convertRelativeTsToAbsolute(processedNestedContent, url.v())
+
             // 缓存内容并返回代理URL
-            val cacheId = M3U8Cache.put(processedContent)
+            val cacheId = M3U8Cache.put(processedTsContent)
+            log.debug("缓存M3U8文件成功，: http://127.0.0.1:9978/proxy/cached_m3u8?id=$cacheId")
             return Url().add("http://127.0.0.1:9978/proxy/cached_m3u8?id=$cacheId")
         } catch (e: Exception) {
             log.error("处理 M3U8 文件失败", e)
@@ -418,7 +460,7 @@ object SiteViewModel {
      */
     private fun downloadAndStoreKey(keyUrl: String): String {
         // 使用带代理配置的HTTP客户端
-        val client = com.corner.util.network.createDefaultOkHttpClient()
+        val client = createDefaultOkHttpClient()
         val request = Request.Builder().url(keyUrl).build()
 
         val keyData = client.newCall(request).execute().use { response ->
@@ -431,6 +473,47 @@ object SiteViewModel {
 
         // 返回通过本地服务器访问的缓存URL
         return "http://127.0.0.1:9978/proxy/cached_m3u8?id=$cacheId"
+    }
+
+    /**
+     * 将 m3u8 文件中的相对路径 .ts 片段转换为完整 URL
+     * 注意：不代理 .ts 文件，直接返回原始完整 URL，让 HLS.js 直接访问
+     * @param content m3u8 文件内容
+     * @param baseUrl m3u8 文件的基准 URL
+     * @return 处理后的 m3u8 内容
+     */
+    private fun convertRelativeTsToAbsolute(content: String, baseUrl: String): String {
+        // 创建基准 URI，用于解析相对路径
+        val baseUri = try {
+            java.net.URI(baseUrl)
+        } catch (e: Exception) {
+            log.error("无效的基准 URL: $baseUrl", e)
+            return content // 如果基准 URL 无效，返回原始内容
+        }
+        
+        // 匹配所有非注释行且包含 .ts 的行
+        return content.lines().joinToString("\n") { line ->
+            when {
+                // 跳过注释行和空行
+                line.startsWith("#") || line.isBlank() -> line
+                // 已经是完整 URL，不需要处理
+                line.startsWith("http") -> line
+                // 处理相对路径的 .ts 文件，转换为完整 URL
+                line.contains(".ts", ignoreCase = true) -> {
+                    try {
+                        // 使用 URI.resolve() 正确解析相对路径
+                        val resolvedUri = baseUri.resolve(line)
+                        val fullUrl = resolvedUri.toString()
+                        log.debug("转换相对路径 .ts: $line -> $fullUrl")
+                        fullUrl // 返回完整的原始 URL，不代理
+                    } catch (e: Exception) {
+                        log.error("URL 解析失败: line=$line, baseUrl=$baseUrl", e)
+                        line // 解析失败时保留原始行
+                    }
+                }
+                else -> line
+            }
+        }
     }
 
 
@@ -476,7 +559,6 @@ object SiteViewModel {
     @Suppress("unused")
     fun searchContent(site: Site, keyword: String, page: String) {
         try {
-            // 检查站点类型是否为 3
             if (site.type == 3) {
                 val spider: Spider = ApiConfig.getSpider(site)
                 val searchContent = spider.searchContent(keyword, false, page)
@@ -523,11 +605,14 @@ object SiteViewModel {
             if (site.type == 3) {
                 val spider: Spider = ApiConfig.getSpider(site)
                 val categoryContent = spider.categoryContent(tid, page, filter, extend)
-                log.debug("type3 cate: $categoryContent")
                 ApiConfig.setRecent(site)
                 result.value = Jsons.decodeFromString<Result>(categoryContent)
+                if (isEmptyResult(result.value)) {
+                    log.warn("type3 cate is Empty: {}", categoryContent)
+                }
+                // 获取封面图片
+                fetchPic(site, result.value)
             } else {
-                // 非类型 3 的站点，构建请求参数
                 val params = mutableMapOf<String, String>()
                 if (site.type == 1 && extend.isNotEmpty()) params["f"] = Jsons.encodeToString(extend)
                 else if (site.type == 4) params["ext"] = Utils.base64(Jsons.encodeToString(extend))
@@ -535,8 +620,12 @@ object SiteViewModel {
                 params["t"] = tid
                 params["pg"] = page
                 val categoryContent = call(site, params, true)
-                log.debug("cate: $categoryContent")
                 result.value = Jsons.decodeFromString<Result>(categoryContent)
+                if (isEmptyResult(result.value)) {
+                    log.warn("type${site.type} cate is Empty: {}", categoryContent)
+                }
+                // 获取封面图片
+                fetchPic(site, result.value)
             }
         } catch (e: Exception) {
             log.error("${site.name} category error", e)
@@ -557,14 +646,12 @@ object SiteViewModel {
             if (quickSearch.value.isEmpty()) {
                 search.value = quickSearch.value.copyAdd(Collect.all())
             }
-            // 同样的数据添加到全部
             quickSearch.value[0].list.addAll(result.list)
         } else {
             search.value = search.value.copyAdd(Collect.create(result.list))
             if (search.value.isEmpty()) {
                 search.value = search.value.copyAdd(Collect.all())
             }
-            // 同样的数据添加到全部
             search.value[0].list.addAll(result.list)
         }
     }
@@ -608,10 +695,10 @@ private fun fetchExt(site: Site, params: MutableMap<String, String>, limit: Bool
 }
 
 private fun fetchExt(site: Site): String {
-    val res: Response = Http.newCall(site.ext, site.header.toHeaders()).execute()
-    if (res.code != 200) return ""
-    site.ext = res.body.string()
-    return site.ext
+    return Http.newCall(site.ext, site.header.toHeaders()).execute().use { res ->
+        if (res.code != 200) return@use ""
+        res.body.string().also { site.ext = it }
+    }
 }
 
 private fun fetchPic(site: Site, result: Result): Result {
@@ -622,8 +709,21 @@ private fun fetchPic(site: Site, result: Result): Result {
     params["ac"] = if (site.type == 0) "videolist" else "detail"
     params["ids"] = StringUtils.join(ids, ",")
     val response: String =
-        Http.newCall(site.api, site.header.toHeaders(), params).execute().body.string()
+        Http.newCall(site.api, site.header.toHeaders(), params).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                log.error("获取视频图片失败，状态码: ${resp.code}")
+                return@use ""
+            }
+            resp.body.string()
+        }
     result.list.clear()
     result.list.addAll(Jsons.decodeFromString<Result>(response).list)
     return result
+}
+
+private fun isEmptyResult(result: Result): Boolean {
+    return result.list.isEmpty() && 
+           result.types.isEmpty() && 
+           result.filters.isEmpty() &&
+           result.url.values.isEmpty()
 }

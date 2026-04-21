@@ -48,24 +48,24 @@ fun FrameContainer(
     }
     Box(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
-        .combinedClickable(
-            enabled = true,
-            onDoubleClick = {
-                controller.togglePlayStatus()
-            },
-            interactionSource = interactionSource,
-            indication = null
-        ) {
-            onClick()
-        }
-        .onPointerEvent(PointerEventType.Scroll) { e ->
-            val y = e.changes.first().scrollDelta.y
-            if (y < 0) {
-                controller.volumeUp()
-            } else {
-                controller.volumeDown()
+            .combinedClickable(
+                enabled = true,
+                onDoubleClick = {
+                    controller.togglePlayStatus()
+                },
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
             }
-        }, contentAlignment = Alignment.Center
+            .onPointerEvent(PointerEventType.Scroll) { e ->
+                val y = e.changes.first().scrollDelta.y
+                if (y < 0) {
+                    controller.volumeUp()
+                } else {
+                    controller.volumeDown()
+                }
+            }, contentAlignment = Alignment.Center
     ) {
         val frameSizeCalculator = remember { FrameContainerSizeCalculator() }
 

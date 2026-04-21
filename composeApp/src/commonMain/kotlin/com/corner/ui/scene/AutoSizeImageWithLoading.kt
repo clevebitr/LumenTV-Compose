@@ -1,5 +1,6 @@
-package com.corner.ui.components
+package com.corner.ui.scene
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -60,7 +61,7 @@ fun AutoSizeImageWithLoading(
                     // 开始加载，显示占位符或加载指示器
                     isLoading = true
                     placeholderPainter?.invoke()?.let { painter ->
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = painter,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
@@ -79,7 +80,7 @@ fun AutoSizeImageWithLoading(
                         else -> null
                     }
                     painter?.let {
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = it,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
@@ -94,7 +95,7 @@ fun AutoSizeImageWithLoading(
                     // 加载失败，显示错误图片
                     isLoading = false
                     errorPainter?.invoke()?.let { painter ->
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = painter,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
@@ -146,7 +147,7 @@ fun AutoSizeImageWithLoading(
                 is ImageEvent -> {
                     isLoading = true
                     placeholderPainter?.invoke()?.let { painter ->
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = painter,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
@@ -164,7 +165,7 @@ fun AutoSizeImageWithLoading(
                         else -> null
                     }
                     painter?.let {
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = it,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
@@ -178,7 +179,7 @@ fun AutoSizeImageWithLoading(
                 is ImageResult.OfError, is ImageResult.OfSource -> {
                     isLoading = false
                     errorPainter?.invoke()?.let { painter ->
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = painter,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),

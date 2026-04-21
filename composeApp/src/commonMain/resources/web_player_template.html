@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>{{title}}</title>
+    <!-- Favicon (使用内联 SVG 避免 404 错误) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.12/dist/hls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     <style>
         :root {
             --primary-color: #00aaff;
@@ -59,7 +62,7 @@
             height: 100%;
             object-fit: contain;
             background: #000;
-            cursor: default; /* 默认鼠标样式 */
+            cursor: default;
         }
 
         .video-info {
@@ -516,7 +519,6 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
-        /* 锁屏按钮 */
         .lock-btn {
             position: absolute;
             right: 16px;
@@ -557,7 +559,6 @@
             color: var(--primary-color);
         }
 
-        /* 锁屏模式下隐藏除锁屏按钮外的所有元素 */
         .player-wrapper.locked-mode .player-controls,
         .player-wrapper.locked-mode .video-info,
         .player-wrapper.locked-mode .toggle-button,
@@ -565,7 +566,6 @@
             display: none !important;
         }
 
-        /* 媒体信息按钮 */
         .info-btn {
             background: none;
             border: none;
@@ -581,7 +581,6 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
-        /* 倍速按钮和下拉菜单 */
         .speed-control {
             position: relative;
         }
@@ -648,7 +647,6 @@
             font-weight: 600;
         }
 
-        /* 进度条悬停预览 */
         .progress-preview {
             position: absolute;
             bottom: 60px;
@@ -702,7 +700,6 @@
             border-top: 6px solid rgba(0, 0, 0, 0.9);
         }
 
-        /* 媒体信息弹窗 */
         .media-info-panel {
             position: absolute;
             top: 16px;
@@ -750,6 +747,24 @@
             color: var(--text-primary);
             text-align: right;
             word-break: break-all;
+        }
+
+        .torrent-status {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0, 170, 255, 0.1);
+            border-radius: 4px;
+            font-size: 12px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .torrent-status__label {
+            color: var(--text-secondary);
+        }
+
+        .torrent-status__value {
+            color: var(--primary-color);
+            font-weight: 600;
         }
 
         @media (max-width: 768px) {
@@ -804,7 +819,7 @@
             
             <div class="loading-overlay hidden" id="loading">
                 <div class="loading-overlay__spinner"></div>
-                <div class="loading-overlay__text">正在加载...</div>
+                <div class="loading-overlay__text" id="loading-text">正在加载...</div>
             </div>
             
             <div class="error-overlay hidden" id="error">
@@ -813,7 +828,6 @@
             </div>
             
             <div class="player-controls hidden" id="player-controls">
-                <!-- 进度条预览tooltip -->
                 <div class="progress-preview" id="progress-preview">
                     <img class="progress-preview__thumbnail" id="preview-thumbnail" alt="预览">
                     <div class="progress-preview__time" id="preview-time">00:00</div>
@@ -853,10 +867,8 @@
                 <span class="toggle-button__icon">⚙️</span>
             </button>
             
-            <!-- 锁屏按钮（独立于控制栏） -->
             <button class="lock-btn" id="lock-btn" title="锁定控制栏">🔓</button>
             
-            <!-- 媒体信息面板 -->
             <div class="media-info-panel" id="media-info-panel">
                 <div class="media-info-panel__title">媒体信息</div>
                 <div id="media-info-content"></div>
@@ -878,6 +890,11 @@
                 <div class="input-group">
                     <label class="input-group__label" for="video-file">或上传文件</label>
                     <input type="file" id="video-file" class="input-group__input" accept="*/*">
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-group__label" for="magnet-url">磁力链接 (Magnet)</label>
+                    <input type="text" id="magnet-url" class="input-group__input" placeholder="magnet:?xt=urn:btih:...">
                 </div>
                 
                 <div class="toggle-group">
@@ -905,11 +922,15 @@
                 this.retryCount = 0;
                 this.maxRetries = 3;
                 this.useProxy = true;
+                this.torrentClient = null;
+                this.currentTorrent = null;
+                this.torrentStatusInterval = null;
                 
                 this.elements = {
                     video: document.getElementById('video-player'),
                     videoInfo: document.querySelector('.video-info'),
                     loading: document.getElementById('loading'),
+                    loadingText: document.getElementById('loading-text'),
                     error: document.getElementById('error'),
                     errorMessage: document.getElementById('error-message'),
                     controlPanel: document.getElementById('control-panel'),
@@ -917,6 +938,7 @@
                     closeButton: document.getElementById('close-panel'),
                     videoUrl: document.getElementById('video-url'),
                     videoFile: document.getElementById('video-file'),
+                    magnetUrl: document.getElementById('magnet-url'),
                     proxyToggle: document.getElementById('proxy-toggle'),
                     playBtn: document.getElementById('play-btn'),
                     clearBtn: document.getElementById('clear-btn'),
@@ -941,21 +963,18 @@
                 };
                 
                 this.controlsTimer = null;
-                this.controlsTimeout = 3000; // 3秒后自动隐藏
+                this.controlsTimeout = 3000;
                 this.isDraggingVolume = false;
                 
-                // 进度条预览相关
                 this.progressPreview = document.getElementById('progress-preview');
                 this.previewThumbnail = document.getElementById('preview-thumbnail');
                 this.previewTime = document.getElementById('preview-time');
-                this.frameCache = new Map(); // 帧缓存
-                this.lastPreviewTime = -1; // 上次预览时间，用于防抖
-                this.isHoveringProgressBar = false; // 鼠标是否在进度条上
+                this.frameCache = new Map();
+                this.lastPreviewTime = -1;
+                this.isHoveringProgressBar = false;
                 
-                // 锁屏状态
                 this.isLocked = false;
                 
-                // 鼠标移动检测
                 this.mouseMoveTimer = null;
                 this.lastMouseMoveTime = 0;
                 
@@ -972,15 +991,17 @@
                 this.bindEvents();
                 await this.connectWebSocket();
                 await this.initPlayer();
+                
+                // 监听页面关闭事件，主动断开WebSocket连接
+                window.addEventListener('beforeunload', () => this.cleanupWebSocket());
+                window.addEventListener('pagehide', () => this.cleanupWebSocket());
             }
             
             bindEvents() {
                 console.log('[Init] Binding events...');
-                // 初始隐藏UI元素
                 this.elements.videoInfo.classList.add('hidden-ui');
                 this.elements.toggleButton.classList.add('hidden-ui');
-                this.elements.lockBtn.classList.remove('visible'); // 确保锁屏按钮初始隐藏
-                console.log('[Init] Lock button initial state: hidden');
+                this.elements.lockBtn.classList.remove('visible');
                 
                 this.elements.toggleButton.addEventListener('click', () => this.togglePanel());
                 this.elements.closeButton.addEventListener('click', () => this.togglePanel());
@@ -992,8 +1013,10 @@
                 this.elements.videoUrl.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') this.playVideo();
                 });
+                this.elements.magnetUrl.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.playVideo();
+                });
                 
-                // 播放器控制事件
                 this.elements.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
                 this.elements.progressBar.addEventListener('click', (e) => this.seekVideo(e));
                 this.elements.volumeBtn.addEventListener('click', () => this.toggleMute());
@@ -1005,36 +1028,29 @@
                     this.toggleSpeedMenu();
                 });
                 
-                // 音量滑块拖拽
                 this.elements.volumeSlider.addEventListener('mousedown', (e) => this.startDraggingVolume(e));
                 document.addEventListener('mousemove', (e) => this.onDraggingVolume(e));
                 document.addEventListener('mouseup', () => this.stopDraggingVolume());
                 
-                // 进度条悬停预览
                 this.elements.progressBar.addEventListener('mousemove', (e) => this.showProgressPreview(e));
                 this.elements.progressBar.addEventListener('mouseleave', () => this.hideProgressPreview());
                 
-                // 倍速菜单项点击事件
                 document.querySelectorAll('.speed-menu__item').forEach(item => {
                     item.addEventListener('click', (e) => {
                         const speed = parseFloat(e.target.dataset.speed);
                         this.setPlaybackSpeed(speed);
-                        this.toggleSpeedMenu(); // 关闭菜单
+                        this.toggleSpeedMenu();
                     });
                 });
                 
-                // 点击其他地方关闭倍速菜单
                 document.addEventListener('click', (e) => {
                     if (!e.target.closest('.speed-control')) {
                         this.elements.speedMenu.classList.remove('visible');
                     }
                 });
                 
-                // 视频事件
                 this.elements.video.addEventListener('loadedmetadata', () => {
-                    console.log('[Video Event] loadedmetadata');
                     this.updateDuration();
-                    // 加载完成后短暂显示UI，然后自动隐藏
                     this.showControls();
                     setTimeout(() => {
                         if (!this.isHoveringProgressBar) {
@@ -1044,52 +1060,21 @@
                 });
                 this.elements.video.addEventListener('timeupdate', () => this.updateProgress());
                 this.elements.video.addEventListener('progress', () => this.updateBuffered());
-                this.elements.video.addEventListener('play', () => {
-                    console.log('[Video Event] play');
-                    this.onPlay();
-                });
-                this.elements.video.addEventListener('pause', () => {
-                    console.log('[Video Event] pause');
-                    this.onPause();
-                });
-                this.elements.video.addEventListener('ended', () => {
-                    console.log('[Video Event] ended');
-                    this.onEnded();
-                });
-                this.elements.video.addEventListener('error', (e) => {
-                    console.error('[Video Event] error:', e);
-                    this.onError(e);
-                });
-                this.elements.video.addEventListener('waiting', () => {
-                    console.log('[Video Event] waiting');
-                    this.showLoading('缓冲中...');
-                });
-                this.elements.video.addEventListener('playing', () => {
-                    console.log('[Video Event] playing');
-                    this.hideLoading();
-                });
-                this.elements.video.addEventListener('loadstart', () => {
-                    console.log('[Video Event] loadstart - 开始加载视频');
-                });
-                this.elements.video.addEventListener('canplay', () => {
-                    console.log('[Video Event] canplay - 可以播放');
-                });
-                this.elements.video.addEventListener('stalled', () => {
-                    console.warn('[Video Event] stalled - 加载停滞');
-                });
+                this.elements.video.addEventListener('play', () => this.onPlay());
+                this.elements.video.addEventListener('pause', () => this.onPause());
+                this.elements.video.addEventListener('ended', () => this.onEnded());
+                this.elements.video.addEventListener('error', (e) => this.onError(e));
+                this.elements.video.addEventListener('waiting', () => this.showLoading('缓冲中...'));
+                this.elements.video.addEventListener('playing', () => this.hideLoading());
                 
-                // 鼠标悬停播放器区域显示UI（统一控制所有UI元素）
                 const playerWrapper = this.elements.video.parentElement;
                 playerWrapper.addEventListener('mouseenter', () => this.showControls());
                 playerWrapper.addEventListener('mouseleave', () => this.hideControls());
                 
-                // 点击视频区域切换控制条显示
                 this.elements.video.addEventListener('click', () => this.toggleControls());
                 
-                // 鼠标移动检测 - 显示控制栏
                 playerWrapper.addEventListener('mousemove', (e) => this.handleMouseMove(e));
                 
-                // 全屏变化事件 - 确保全屏时控制栏正常工作
                 document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
             }
             
@@ -1100,39 +1085,76 @@
             clearInputs() {
                 this.elements.videoUrl.value = '';
                 this.elements.videoFile.value = '';
+                this.elements.magnetUrl.value = '';
+                
+                this.cleanupTorrent();
+            }
+            
+            cleanupTorrent() {
+                if (this.torrentStatusInterval) {
+                    clearInterval(this.torrentStatusInterval);
+                    this.torrentStatusInterval = null;
+                }
+                
+                if (this.currentTorrent) {
+                    this.currentTorrent.destroy();
+                    this.currentTorrent = null;
+                }
+                
+                if (this.torrentClient) {
+                    this.torrentClient.destroy();
+                    this.torrentClient = null;
+                }
             }
             
             async connectWebSocket() {
                 if (this.retryCount >= this.maxRetries) {
-                    console.error('WebSocket连接失败，达到最大重试次数');
+                    console.error('[WebSocket] 连接失败，达到最大重试次数');
                     return;
                 }
                 
                 try {
-                    this.ws = new WebSocket('ws://localhost:8888');
+                    // 从 URL 参数中获取 Ktor 端口（用于 WebSocket 连接）
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const ktorPort = urlParams.get('ktorPort') || '9978';
+                    
+                    console.log(`[WebSocket] 连接到 Ktor 服务器: ws://localhost:${ktorPort}/ws/video-events`);
+                    this.ws = new WebSocket(`ws://localhost:${ktorPort}/ws/video-events`);
                     
                     this.ws.onopen = () => {
-                        console.log('WebSocket连接已建立');
+                        console.log('[WebSocket] 连接已建立');
                         this.retryCount = 0;
+                        // 通知服务器播放开始
+                        this.sendWebSocketMessage('PLAYBACK_STARTED');
                     };
                     
-                    this.ws.onclose = () => {
-                        console.log('WebSocket连接已关闭');
+                    this.ws.onclose = (event) => {
+                        console.log(`[WebSocket] 连接已关闭 (code: ${event.code}, reason: ${event.reason})`);
+                        
+                        // 如果是正常关闭（页面主动关闭），不再重连
+                        if (event.code === 1000 && event.reason === 'Page closing') {
+                            console.log('[WebSocket] 页面主动关闭，停止重连');
+                            return;
+                        }
+                        
+                        // 其他情况尝试重连
                         setTimeout(() => {
                             this.retryCount++;
+                            console.log(`[WebSocket] 尝试第 ${this.retryCount} 次重连...`);
                             this.connectWebSocket();
-                        }, 2000);
+                        }, 2000 * Math.pow(1.5, this.retryCount - 1)); // 指数退避
                     };
                     
                     this.ws.onerror = (error) => {
-                        console.error('WebSocket错误:', error);
+                        console.error('[WebSocket] 错误:', error);
                     };
                 } catch (error) {
-                    console.error('WebSocket连接异常:', error);
+                    console.error('[WebSocket] 连接异常:', error);
                     setTimeout(() => {
                         this.retryCount++;
+                        console.log(`[WebSocket] 异常后尝试第 ${this.retryCount} 次重连...`);
                         this.connectWebSocket();
-                    }, 2000);
+                    }, 2000 * Math.pow(1.5, this.retryCount - 1)); // 指数退避
                 }
             }
             
@@ -1178,32 +1200,38 @@
             }
             
             detectVideoType(url) {
+                if (url.startsWith('magnet:?')) {
+                    return 'magnet';
+                }
+                            
                 const urlWithoutParams = url.split('?')[0].toLowerCase();
-                
+                            
                 if (urlWithoutParams.includes('.m3u8')) return 'hls';
                 if (urlWithoutParams.includes('.mpd')) return 'dash';
                 if (urlWithoutParams.includes('.mp4')) return 'mp4';
                 if (urlWithoutParams.includes('.webm')) return 'webm';
                 if (urlWithoutParams.includes('.flv')) return 'flv';
                 if (urlWithoutParams.includes('.ts')) return 'ts';
-                
-                // 默认尝试 HLS，因为很多代理URL都是m3u8
-                console.log('无法从URL判断类型，默认为 auto');
+                            
                 return 'auto';
             }
             
             async playVideo() {
                 const url = this.elements.videoUrl.value.trim();
                 const file = this.elements.videoFile.files[0];
+                const magnetUrl = this.elements.magnetUrl.value.trim();
                 
-                if (!url && !file) {
-                    alert('请输入视频URL或上传文件');
+                if (!url && !file && !magnetUrl) {
+                    alert('请输入视频URL、上传文件或输入磁力链接');
                     return;
                 }
                 
                 this.hideError();
+                this.cleanupTorrent();
                 
-                if (file) {
+                if (magnetUrl) {
+                    await this.playMagnet(magnetUrl);
+                } else if (file) {
                     await this.playFile(file);
                 } else if (url) {
                     await this.playUrl(url);
@@ -1224,13 +1252,18 @@
             
             async playUrl(url) {
                 console.log('playUrl 开始执行, URL:', url);
+                
+                if (url.startsWith('magnet:?')) {
+                    await this.playMagnet(url);
+                    return;
+                }
+                
                 this.parseVideoInfo(url);
                 this.updateVideoInfo();
                 
                 const videoType = this.detectVideoType(url);
                 console.log('视频类型:', videoType);
                 
-                // 智能代理逻辑：避免重复代理
                 let playUrl = url;
                 if (this.useProxy && this.needProxy(url)) {
                     playUrl = this.getProxyUrl(this.extractOriginalUrl(url));
@@ -1239,7 +1272,6 @@
                 
                 this.showLoading('正在加载视频...');
                 
-                // 停止之前的播放
                 if (this.hls) {
                     this.hls.destroy();
                     this.hls = null;
@@ -1249,13 +1281,11 @@
                 this.elements.video.src = '';
                 
                 try {
-                    console.log('开始播放, 类型:', videoType);
                     if (videoType === 'hls') {
                         this.playHls(playUrl);
                     } else {
                         this.playNormal(playUrl);
                     }
-                    console.log('播放初始化完成');
                 } catch (error) {
                     console.error('播放失败:', error);
                     this.showError('播放失败: ' + error.message);
@@ -1263,7 +1293,6 @@
             }
             
             playHls(url) {
-                console.log('playHls 开始, URL:', url);
                 if (!Hls.isSupported()) {
                     throw new Error('浏览器不支持HLS播放');
                 }
@@ -1274,14 +1303,11 @@
                     backBufferLength: 90
                 });
                 
-                console.log('HLS实例创建成功，加载源...');
                 this.hls.loadSource(url);
                 this.hls.attachMedia(this.elements.video);
                 
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    console.log('HLS流解析完成');
                     this.hideLoading();
-                    // 尝试自动播放
                     this.elements.video.play().catch(err => {
                         console.warn('HLS自动播放被阻止:', err);
                     });
@@ -1292,102 +1318,195 @@
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.log('网络错误，尝试恢复...');
                                 this.hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.log('媒体错误，尝试恢复...');
                                 this.hls.recoverMediaError();
                                 break;
                             default:
-                                console.error('无法恢复的HLS错误');
                                 this.hls.destroy();
                                 this.showError('HLS播放失败');
                                 break;
                         }
                     }
                 });
-                
-                console.log('HLS初始化完成');
             }
             
             async playNormal(url) {
-                console.log('=== playNormal 开始 ===');
-                console.log('设置 video.src:', url);
                 this.elements.video.src = url;
-                console.log('video.src 已设置:', this.elements.video.src);
                 
-                // 不等待 Promise，直接返回，让视频异步加载
-                this.setupVideoEventHandlers();
-                
-                // 尝试播放（可能被浏览器阻止）
-                console.log('尝试自动播放...');
-                this.elements.video.play().then(() => {
-                    console.log('自动播放成功');
-                }).catch(err => {
+                this.elements.video.play().catch(err => {
                     console.warn('自动播放被阻止:', err.message);
-                    console.log('视频将在用户交互后播放');
                 });
-                
-                console.log('playNormal 执行完成，视频正在后台加载');
             }
             
-            setupVideoEventHandlers() {
-                console.log('创建 Promise, 添加事件监听器...');
-                const timeout = setTimeout(() => {
-                    console.warn('视频加载超时(10秒)');
-                    this.hideLoading();
-                }, 10000); // 10秒超时
+            async playMagnet(magnetUrl) {
+                console.log('[WebTorrent] 开始播放磁力链接:', magnetUrl);
                 
-                const onLoaded = () => {
-                    console.log('loadedmetadata 事件触发');
-                    clearTimeout(timeout);
-                    this.elements.video.removeEventListener('loadedmetadata', onLoaded);
-                    this.elements.video.removeEventListener('error', onError);
-                    console.log('视频元数据加载完成');
-                    this.hideLoading();
-                };
+                if (!magnetUrl.startsWith('magnet:?')) {
+                    this.showError('无效的磁力链接格式');
+                    return;
+                }
                 
-                const onError = (e) => {
-                    console.error('error 事件触发:', e);
-                    clearTimeout(timeout);
-                    this.elements.video.removeEventListener('loadedmetadata', onLoaded);
-                    this.elements.video.removeEventListener('error', onError);
-                    console.error('视频加载错误:', e);
-                    this.showError('视频加载失败');
-                };
+                this.showLoading('正在初始化 WebTorrent...');
                 
-                this.elements.video.addEventListener('loadedmetadata', onLoaded);
-                this.elements.video.addEventListener('error', onError);
-                console.log('事件监听器已添加');
+                try {
+                    // 创建 WebTorrent 客户端
+                    if (!this.torrentClient) {
+                        this.torrentClient = new WebTorrent();
+                        console.log('[WebTorrent] 客户端已创建');
+                    }
+                    
+                    this.showLoading('正在获取种子信息...');
+                    
+                    // 添加磁力链接
+                    this.torrentClient.add(magnetUrl, (torrent) => {
+                        console.log('[WebTorrent] 种子已添加:', torrent.infoHash);
+                        this.currentTorrent = torrent;
+                        
+                        // 更新加载状态
+                        this.showLoading(`正在连接 Peers... (0 个连接)`);
+                        
+                        // 监听 peer 连接
+                        torrent.on('ready', () => {
+                            console.log('[WebTorrent] 种子已就绪');
+                            this.showLoading('种子已就绪，正在查找视频文件...');
+                        });
+                        
+                        // 监听下载进度
+                        torrent.on('download', () => {
+                            const progress = (torrent.progress * 100).toFixed(1);
+                            const downloadSpeed = (torrent.downloadSpeed / 1024 / 1024).toFixed(2);
+                            const uploadSpeed = (torrent.uploadSpeed / 1024 / 1024).toFixed(2);
+                            const peers = torrent.numPeers;
+                            
+                            this.showLoading(`下载进度: ${progress}% | 速度: ${downloadSpeed} MB/s | Peers: ${peers}`);
+                            
+                            // 更新媒体信息面板中的种子状态
+                            this.updateTorrentStatus();
+                        });
+                        
+                        // 监听完成事件
+                        torrent.on('done', () => {
+                            console.log('[WebTorrent] 下载完成！');
+                            this.showLoading('下载完成！');
+                            setTimeout(() => this.hideLoading(), 1000);
+                        });
+                        
+                        // 监听错误
+                        torrent.on('error', (err) => {
+                            console.error('[WebTorrent] 错误:', err);
+                            this.showError('种子加载失败: ' + err.message);
+                        });
+                        
+                        // 监听警告
+                        torrent.on('warning', (warn) => {
+                            console.warn('[WebTorrent] 警告:', warn);
+                        });
+                        
+                        // 查找视频文件
+                        const videoFile = torrent.files.find(file => {
+                            const ext = file.name.split('.').pop().toLowerCase();
+                            return ['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'm4v'].includes(ext);
+                        });
+                        
+                        if (!videoFile) {
+                            this.showError('未找到可播放的视频文件');
+                            console.error('[WebTorrent] 文件列表:', torrent.files.map(f => f.name));
+                            return;
+                        }
+                        
+                        console.log('[WebTorrent] 找到视频文件:', videoFile.name);
+                        console.log('[WebTorrent] 文件大小:', (videoFile.length / 1024 / 1024).toFixed(2), 'MB');
+                        
+                        // 更新视频信息显示
+                        this.updateVideoInfoDisplay(
+                            `📦 ${torrent.name || '种子文件'}`,
+                            `🎬 ${videoFile.name}`
+                        );
+                        
+                        // 渲染视频到 video 元素
+                        this.showLoading('正在渲染视频...');
+                        
+                        videoFile.renderTo(this.elements.video, {
+                            autoplay: false,
+                            controls: false
+                        }, (err) => {
+                            if (err) {
+                                console.error('[WebTorrent] 渲染失败:', err);
+                                this.showError('视频渲染失败: ' + err.message);
+                                return;
+                            }
+                            
+                            console.log('[WebTorrent] 视频渲染成功');
+                            this.hideLoading();
+                            
+                            // 尝试自动播放
+                            this.elements.video.play().catch(playErr => {
+                                console.warn('[WebTorrent] 自动播放被阻止:', playErr.message);
+                            });
+                        });
+                        
+                        // 启动状态更新定时器
+                        this.startTorrentStatusUpdates();
+                    });
+                    
+                } catch (error) {
+                    console.error('[WebTorrent] 播放失败:', error);
+                    this.showError('磁力链接播放失败: ' + error.message);
+                }
+            }
+            
+            startTorrentStatusUpdates() {
+                if (this.torrentStatusInterval) {
+                    clearInterval(this.torrentStatusInterval);
+                }
+                
+                this.torrentStatusInterval = setInterval(() => {
+                    this.updateTorrentStatus();
+                }, 1000);
+            }
+            
+            updateTorrentStatus() {
+                if (!this.currentTorrent) return;
+                
+                const torrent = this.currentTorrent;
+                const progress = (torrent.progress * 100).toFixed(1);
+                const downloadSpeed = (torrent.downloadSpeed / 1024 / 1024).toFixed(2);
+                const uploadSpeed = (torrent.uploadSpeed / 1024 / 1024).toFixed(2);
+                const peers = torrent.numPeers;
+                const downloaded = (torrent.downloaded / 1024 / 1024).toFixed(0);
+                const total = (torrent.length / 1024 / 1024).toFixed(0);
+                
+                // 可以在这里更新 UI 显示种子状态
+                console.log(`[WebTorrent] 进度: ${progress}% | ${downloaded}/${total}MB | ↓${downloadSpeed}MB/s ↑${uploadSpeed}MB/s | Peers: ${peers}`);
+            }
+            
+            updateVideoInfoDisplay(epName, epNumber) {
+                if (this.elements.epName) {
+                    this.elements.epName.textContent = epName || '--';
+                }
+                if (this.elements.epNumber) {
+                    this.elements.epNumber.textContent = epNumber || '--';
+                }
             }
             
             needProxy(url) {
-                // 检查URL是否已经是代理URL
                 if (url.includes('localhost:9978') || url.includes('127.0.0.1:9978')) {
-                    console.log('URL已经是代理URL，跳过代理:', url);
                     return false;
                 }
                 
-                // 检查是否需要代理（非本地地址）
-                const isLocal = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('192.168.') || url.includes('10.') || url.includes('172.');
+                const isLocal = url.includes('localhost') || url.includes('127.0.0.1') || 
+                               url.includes('192.168.') || url.includes('10.') || url.includes('172.');
                 
-                if (isLocal) {
-                    console.log('本地URL，跳过代理:', url);
-                    return false;
-                }
-                
-                console.log('需要代理的URL:', url);
-                return true;
+                return !isLocal;
             }
             
             extractOriginalUrl(url) {
-                // 如果已经是代理URL，提取原始URL
                 if (url.includes('proxy?url=')) {
                     const urlObj = new URL(url);
                     const originalUrl = urlObj.searchParams.get('url');
                     if (originalUrl) {
-                        console.log('从代理URL提取原始URL:', originalUrl);
                         return decodeURIComponent(originalUrl);
                     }
                 }
@@ -1395,17 +1514,13 @@
             }
             
             getProxyUrl(url) {
-                const proxyUrl = `http://localhost:9978/video/proxy?url=${encodeURIComponent(url)}`;
-                console.log('使用代理URL:', proxyUrl);
-                return proxyUrl;
+                return `http://localhost:9978/video/proxy?url=${encodeURIComponent(url)}`;
             }
             
-            // 播放器控制方法
-            // 音量滑块拖拽功能
             startDraggingVolume(e) {
                 this.isDraggingVolume = true;
                 this.setVolumeFromEvent(e);
-                e.preventDefault(); // 防止文本选择
+                e.preventDefault();
             }
             
             onDraggingVolume(e) {
@@ -1431,10 +1546,10 @@
             togglePlayPause() {
                 if (this.elements.video.paused) {
                     this.elements.video.play();
-                    this.resetControlsTimer(); // 播放时启动计时器
+                    this.resetControlsTimer();
                 } else {
                     this.elements.video.pause();
-                    this.clearControlsTimer(); // 暂停时清除计时器，保持控制栏显示
+                    this.clearControlsTimer();
                 }
             }
             
@@ -1446,14 +1561,6 @@
             
             toggleMute() {
                 this.elements.video.muted = !this.elements.video.muted;
-                this.updateVolumeIcon();
-            }
-            
-            setVolume(e) {
-                const rect = this.elements.volumeSlider.getBoundingClientRect();
-                let percent = (e.clientX - rect.left) / rect.width;
-                percent = Math.max(0, Math.min(1, percent));
-                this.elements.video.volume = percent;
                 this.updateVolumeIcon();
             }
             
@@ -1482,7 +1589,6 @@
                 const duration = this.formatTime(video.duration);
                 this.elements.timeDisplay.textContent = `${currentTime} / ${duration}`;
                 
-                // 更新音量条
                 this.elements.volumeFilled.style.width = (video.volume * 100) + '%';
             }
             
@@ -1490,7 +1596,6 @@
                 const video = this.elements.video;
                 if (!video.duration || video.buffered.length === 0) return;
                 
-                // 获取最后缓冲的时间点
                 const bufferedEnd = video.buffered.end(video.buffered.length - 1);
                 const percent = (bufferedEnd / video.duration) * 100;
                 this.elements.progressBuffered.style.width = percent + '%';
@@ -1509,18 +1614,21 @@
                 this.sendWebSocketMessage('PLAYBACK_STARTED');
                 this.hideLoading();
                 this.hideError();
-                // 开始自动隐藏计时
                 this.resetControlsTimer();
             }
             
             onPause() {
                 this.elements.playPauseBtn.textContent = '▶️';
-                console.log('视频暂停');
             }
             
             onEnded() {
-                console.log('视频播放结束');
+                console.log('[Playback] 视频播放完成');
                 this.sendWebSocketMessage('PLAYBACK_FINISHED');
+                
+                // 播放完成后，延迟关闭WebSocket连接，给服务器时间处理消息
+                setTimeout(() => {
+                    this.cleanupWebSocket();
+                }, 500);
             }
             
             onError(e) {
@@ -1528,44 +1636,33 @@
                 this.showError('视频播放失败');
             }
             
-            // 全屏功能
             toggleFullscreen() {
                 if (!document.fullscreenElement) {
                     this.elements.video.requestFullscreen().then(() => {
-                        console.log('[Fullscreen] 进入全屏模式');
                         this.elements.fullscreenBtn.textContent = '⛶';
                     }).catch(err => {
                         console.error('[Fullscreen] 无法进入全屏:', err);
                     });
                 } else {
                     document.exitFullscreen().then(() => {
-                        console.log('[Fullscreen] 退出全屏模式');
                         this.elements.fullscreenBtn.textContent = '⛶';
                     });
                 }
             }
             
-            // 处理全屏变化
             handleFullscreenChange() {
                 const isFullscreen = !!document.fullscreenElement;
-                console.log('[Fullscreen] 状态变化:', isFullscreen ? '进入全屏' : '退出全屏');
                 
-                // 全屏时确保控制栏能正常显示
                 if (isFullscreen) {
-                    console.log('[Fullscreen] 进入全屏，显示控制栏');
-                    // 进入全屏后，短暂显示控制栏让用户知道如何操作
                     this.showControls();
                     setTimeout(() => {
                         if (!this.isHoveringProgressBar) {
                             this.hideControls();
                         }
                     }, 2000);
-                } else {
-                    console.log('[Fullscreen] 退出全屏');
                 }
             }
             
-            // 锁屏功能
             toggleLock() {
                 this.isLocked = !this.isLocked;
                 
@@ -1573,23 +1670,18 @@
                     this.elements.lockBtn.textContent = '🔒';
                     this.elements.lockBtn.classList.add('locked');
                     this.elements.lockBtn.title = '解锁控制栏';
-                    // 添加锁定模式类，隐藏所有UI元素
                     document.querySelector('.player-wrapper').classList.add('locked-mode');
-                    // 但保持锁屏按钮可见
                     this.elements.lockBtn.classList.add('visible');
                 } else {
                     this.elements.lockBtn.textContent = '🔓';
                     this.elements.lockBtn.classList.remove('locked');
                     this.elements.lockBtn.title = '锁定控制栏';
-                    // 移除锁定模式类
                     document.querySelector('.player-wrapper').classList.remove('locked-mode');
                     this.elements.lockBtn.classList.remove('visible');
-                    // 显示所有UI
                     this.showControls();
                 }
             }
             
-            // 倍速播放功能
             toggleSpeedMenu() {
                 this.elements.speedMenu.classList.toggle('visible');
             }
@@ -1598,7 +1690,6 @@
                 this.elements.video.playbackRate = speed;
                 this.elements.speedBtn.textContent = speed + 'x';
                 
-                // 更新菜单中的激活状态
                 document.querySelectorAll('.speed-menu__item').forEach(item => {
                     const itemSpeed = parseFloat(item.dataset.speed);
                     if (itemSpeed === speed) {
@@ -1607,11 +1698,8 @@
                         item.classList.remove('active');
                     }
                 });
-                
-                console.log('播放速度设置为:', speed + 'x');
             }
             
-            // 媒体信息功能
             toggleMediaInfo() {
                 const isVisible = this.elements.mediaInfoPanel.classList.contains('visible');
                 
@@ -1625,46 +1713,37 @@
             
             updateMediaInfo() {
                 const video = this.elements.video;
-                const info = [];
+                let info = [];
                 
-                // 视频URL
                 if (video.src) {
                     info.push({ label: '视频链接', value: video.src });
                 }
                 
-                // 视频时长
                 if (video.duration && !isNaN(video.duration)) {
                     info.push({ label: '时长', value: this.formatTime(video.duration) });
                 }
                 
-                // 当前时间
-                if (video.currentTime && !isNaN(video.currentTime)) {
-                    info.push({ label: '当前播放', value: this.formatTime(video.currentTime) });
-                }
-                
-                // 视频尺寸
                 if (video.videoWidth && video.videoHeight) {
                     info.push({ label: '分辨率', value: `${video.videoWidth} x ${video.videoHeight}` });
                 }
                 
-                // 音量
                 info.push({ label: '音量', value: `${Math.round(video.volume * 100)}%` });
-                
-                // 是否静音
                 info.push({ label: '静音状态', value: video.muted ? '是' : '否' });
-                
-                // 播放速率
                 info.push({ label: '播放速率', value: `${video.playbackRate}x` });
                 
-                // 网络状态
-                const networkStateMap = ['空', '加载中', '已加载', '无来源'];
-                info.push({ label: '网络状态', value: networkStateMap[video.networkState] || '未知' });
+                // 如果是 WebTorrent，添加种子状态
+                if (this.currentTorrent) {
+                    const torrent = this.currentTorrent;
+                    info.push({ label: '━━━━━━━━━━', value: '━━━━━━━━━━' });
+                    info.push({ label: '📦 种子名称', value: torrent.name || '未知' });
+                    info.push({ label: '📊 下载进度', value: `${(torrent.progress * 100).toFixed(1)}%` });
+                    info.push({ label: '⬇️ 下载速度', value: `${(torrent.downloadSpeed / 1024 / 1024).toFixed(2)} MB/s` });
+                    info.push({ label: '⬆️ 上传速度', value: `${(torrent.uploadSpeed / 1024 / 1024).toFixed(2)} MB/s` });
+                    info.push({ label: '👥 Peers', value: torrent.numPeers });
+                    info.push({ label: '💾 已下载', value: `${(torrent.downloaded / 1024 / 1024).toFixed(0)} MB` });
+                    info.push({ label: '📁 总大小', value: `${(torrent.length / 1024 / 1024).toFixed(0)} MB` });
+                }
                 
-                // 就绪状态
-                const readyStateMap = ['没有数据', '元数据', '当前帧', '未来数据', '足够数据'];
-                info.push({ label: '就绪状态', value: readyStateMap[video.readyState] || '未知' });
-                
-                // 渲染HTML
                 this.elements.mediaInfoContent.innerHTML = info.map(item => `
                     <div class="media-info-panel__item">
                         <span class="media-info-panel__label">${item.label}</span>
@@ -1673,15 +1752,12 @@
                 `).join('');
             }
             
-            // 鼠标移动处理
             handleMouseMove(e) {
                 const now = Date.now();
                 
-                // 防抖：50ms内只处理一次
                 if (now - this.lastMouseMoveTime < 50) return;
                 this.lastMouseMoveTime = now;
                 
-                // 如果已锁定，只显示/隐藏锁屏按钮（不显示其他UI）
                 if (this.isLocked) {
                     this.elements.lockBtn.classList.add('visible');
                     
@@ -1695,36 +1771,19 @@
                     return;
                 }
                 
-                // 未锁定状态，显示所有控制栏（包括锁屏按钮）
                 this.showControls();
                 
-                // 清除之前的定时器
                 if (this.mouseMoveTimer) {
                     clearTimeout(this.mouseMoveTimer);
                 }
                 
-                // 设置新的定时器，3秒后隐藏
                 this.mouseMoveTimer = setTimeout(() => {
                     if (!this.isHoveringProgressBar) {
                         this.hideControls();
                     }
                 }, this.controlsTimeout);
             }
-            
-            // 隐藏所有控制（锁屏时使用）
-            hideAllControls() {
-                this.clearControlsTimer();
-                // 如果已锁定，保持锁屏按钮可见
-                if (!this.isLocked) {
-                    this.elements.playerControls.classList.remove('visible');
-                    this.elements.lockBtn.classList.remove('visible');
-                }
-                this.elements.videoInfo.classList.add('hidden-ui');
-                this.elements.toggleButton.classList.add('hidden-ui');
-                this.elements.mediaInfoPanel.classList.remove('visible');
-            }
                     
-            // 进度条悬停预览
             showProgressPreview(e) {
                 const rect = this.elements.progressBar.getBoundingClientRect();
                 const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -1732,27 +1791,21 @@
                         
                 if (!this.elements.video.duration || isNaN(time)) return;
                         
-                // 标记鼠标在进度条上，阻止自动隐藏
                 this.isHoveringProgressBar = true;
-                this.clearControlsTimer(); // 清除自动隐藏定时器
+                this.clearControlsTimer();
                         
-                // 防抖：如果时间变化小于0.5秒，不更新
                 if (Math.abs(time - this.lastPreviewTime) < 0.5) return;
                 this.lastPreviewTime = time;
                         
-                // 更新时间显示
                 this.previewTime.textContent = this.formatTime(time);
                         
-                // 定位tooltip
                 const previewX = e.clientX - rect.left;
                 this.progressPreview.style.left = previewX + 'px';
                 this.progressPreview.classList.add('visible');
                         
-                // 尝试加载帧预览（仅对直接可播放的格式）
                 if (this.canShowFramePreview(this.elements.video.src)) {
                     this.loadFramePreview(time);
                 } else {
-                    // HLS流只显示时间
                     this.previewThumbnail.classList.remove('visible');
                 }
             }
@@ -1760,22 +1813,17 @@
             hideProgressPreview() {
                 this.progressPreview.classList.remove('visible');
                 this.lastPreviewTime = -1;
-                this.isHoveringProgressBar = false; // 鼠标离开进度条
-                this.resetControlsTimer(); // 恢复自动隐藏计时
+                this.isHoveringProgressBar = false;
+                this.resetControlsTimer();
             }
                     
-            // 判断是否可以显示帧预览
             canShowFramePreview(url) {
                 if (!url) return false;
-                // m3u8、m3u等HLS格式不支持精确定位
                 if (url.includes('.m3u8') || url.includes('.m3u')) return false;
-                // mp4、mkv、webm等直接格式支持
                 return url.match(/\.(mp4|mkv|webm|avi|mov)$/i) !== null;
             }
                     
-            // 加载帧预览
             async loadFramePreview(targetTime) {
-                // 检查缓存
                 const cacheKey = Math.floor(targetTime);
                 if (this.frameCache.has(cacheKey)) {
                     this.previewThumbnail.src = this.frameCache.get(cacheKey);
@@ -1784,51 +1832,41 @@
                 }
                         
                 try {
-                    // 创建临时video元素
                     const tempVideo = document.createElement('video');
                     tempVideo.src = this.elements.video.src;
                     tempVideo.muted = true;
                     tempVideo.preload = 'auto';
                             
-                    // 等待元数据加载
                     await new Promise((resolve, reject) => {
                         tempVideo.addEventListener('loadedmetadata', resolve);
                         tempVideo.addEventListener('error', reject);
-                        setTimeout(reject, 3000); // 3秒超时
+                        setTimeout(reject, 3000);
                     });
                             
-                    // 跳转到目标时间
                     tempVideo.currentTime = targetTime;
                             
-                    // 等待seek完成
                     await new Promise((resolve) => {
                         tempVideo.addEventListener('seeked', resolve, { once: true });
                     });
                             
-                    // 使用canvas截取帧
                     const canvas = document.createElement('canvas');
                     canvas.width = 320;
                     canvas.height = 180;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
                             
-                    // 转换为base64
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                             
-                    // 缓存
                     this.frameCache.set(cacheKey, dataUrl);
                             
-                    // 限制缓存大小（最多20帧）
                     if (this.frameCache.size > 20) {
                         const firstKey = this.frameCache.keys().next().value;
                         this.frameCache.delete(firstKey);
                     }
                             
-                    // 显示预览
                     this.previewThumbnail.src = dataUrl;
                     this.previewThumbnail.classList.add('visible');
                             
-                    // 清理临时元素
                     tempVideo.remove();
                     canvas.remove();
                             
@@ -1838,13 +1876,11 @@
                 }
             }
             
-            // 自动隐藏控制栏
             showControls() {
                 this.elements.playerControls.classList.add('visible');
                 this.elements.videoInfo.classList.remove('hidden-ui');
                 this.elements.toggleButton.classList.remove('hidden-ui');
                 
-                // 始终显示锁屏按钮（无论是否锁定）
                 this.elements.lockBtn.classList.add('visible');
                 
                 this.resetControlsTimer();
@@ -1856,15 +1892,12 @@
                 this.elements.videoInfo.classList.add('hidden-ui');
                 this.elements.toggleButton.classList.add('hidden-ui');
                 
-                // 未锁定时隐藏锁屏按钮
                 if (!this.isLocked) {
                     this.elements.lockBtn.classList.remove('visible');
                 }
-                // 锁定时保持锁屏按钮可见（由handleMouseMove控制）
             }
             
             toggleControls() {
-                // 如果已锁定，不允许通过点击切换控制栏
                 if (this.isLocked) return;
                 
                 const isVisible = this.elements.playerControls.classList.contains('visible');
@@ -1877,7 +1910,6 @@
             
             resetControlsTimer() {
                 this.clearControlsTimer();
-                // 只有视频播放时才自动隐藏，且鼠标不在进度条上
                 if (!this.elements.video.paused && !this.isHoveringProgressBar) {
                     this.controlsTimer = setTimeout(() => {
                         this.hideControls();
@@ -1893,7 +1925,7 @@
             }
             
             showLoading(text = '正在加载...') {
-                this.elements.loading.querySelector('.loading-overlay__text').textContent = text;
+                this.elements.loadingText.textContent = text;
                 this.elements.loading.classList.remove('hidden');
             }
             
@@ -1914,6 +1946,21 @@
             sendWebSocketMessage(message) {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(message);
+                }
+            }
+            
+            /**
+             * 清理WebSocket连接
+             * 在页面关闭时调用，避免服务端持续重连
+             */
+            cleanupWebSocket() {
+                if (this.ws) {
+                    console.log('[Cleanup] 页面关闭，断开WebSocket连接');
+                    // 阻止自动重连
+                    this.retryCount = this.maxRetries;
+                    // 关闭连接
+                    this.ws.close(1000, 'Page closing');
+                    this.ws = null;
                 }
             }
         }

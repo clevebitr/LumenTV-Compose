@@ -2,9 +2,9 @@ package com.corner.util.update
 
 import com.corner.util.AppVersion
 import com.corner.util.io.Paths
-import com.corner.util.OperatingSystem
-import com.corner.util.UserDataDirProvider
-import com.corner.util.network.KtorClient
+import com.corner.util.system.OperatingSystem
+import com.corner.util.net.KtorClient
+import com.corner.util.system.SysVerUtil
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +16,6 @@ class UpdateManager {
     companion object {
         private val log = LoggerFactory.getLogger(UpdateManager::class.java)
         private const val VERSION_URL = "https://github.com/clevebitr/LumenTV-Compose/releases/latest/download/version.json"
-        // 从统一配置读取版本号（不要硬编码！）
         private val CURRENT_VERSION = AppVersion.VERSION
         private const val NO_REMIND_FILE = "no_remind_update.txt"
 
@@ -96,7 +95,7 @@ class UpdateManager {
         }
 
         private fun getPlatformInfo(versionInfo: VersionInfo): PlatformInfo? {
-            return when (UserDataDirProvider.currentOs) {
+            return when (SysVerUtil.currentOs) {
                 OperatingSystem.Windows -> versionInfo.windows
                 OperatingSystem.Linux -> versionInfo.linux
                 OperatingSystem.MacOS -> versionInfo.mac

@@ -1,9 +1,9 @@
 package com.corner.init
 
 import androidx.compose.runtime.mutableStateOf
-import com.corner.bean.Hot
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
+import com.corner.util.Hot
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.catvodcore.config.init
 import com.corner.catvodcore.enum.ConfigType
@@ -26,7 +26,6 @@ import org.koin.core.context.startKoin
 import org.slf4j.LoggerFactory
 import androidx.compose.runtime.State
 import com.corner.catvodcore.viewmodel.GlobalAppState.resetAllStates
-import com.corner.util.play.BrowserUtils
 import com.corner.util.spider.SpiderTestUtil
 
 private val log = LoggerFactory.getLogger("Init")
@@ -50,6 +49,7 @@ class Init {
         suspend fun start() {
             showProgress()
             try {
+                initJarFileSystemProvider()
                 //Koin
                 initKoin()
                 //Http Server
@@ -70,6 +70,19 @@ class Init {
                 hideProgress()
             }
         }
+        
+        /**
+         * 初始化 JAR 文件系统提供者
+         * 解决 Playwright 在生产环境下无法从 JAR 中提取驱动的问题
+         */
+        private fun initJarFileSystemProvider() {
+            try {
+                Class.forName("jdk.nio.zipfs.ZipFileSystemProvider")
+                log.info("JAR 文件系统提供者已加载")
+            } catch (e: Exception) {
+                log.warn("加载 JAR 文件系统提供者失败，Playwright 可能无法正常工作: ${e.message}")
+            }
+        }
 
         /**
          * 关闭应用服务
@@ -79,7 +92,6 @@ class Init {
             try {
                 VlcJInit.release()      //release VlcJ
                 resetAllStates()        //reset all states
-                BrowserUtils.cleanupWebSocketServer()  //stop webSocket
                 KtorD.stop()            //stop KtorD
                 stopKoin()              //stop Koin
                 stopDLNA()              //stop DLNA
@@ -156,6 +168,7 @@ class Init {
 
                 if (StringUtils.isBlank(vod)) {
                     log.warn("未配置点播源，跳过初始化")
+                    hideProgress()
                     _isInitializedSuccessfully.value = false  // 初始化失败
                     return
                 }
@@ -184,7 +197,7 @@ class Init {
                     ).init()
                     _isInitializedSuccessfully.value = true  // 回退方式初始化成功
                 } catch (e2: Exception) {
-                    log.error("JSON 解析也失败", e2)
+                    log.error("JSON解析失败,初始化配置失败！", e2)
                     _isInitializedSuccessfully.value = false  // 完全失败
                     hideProgress()
                     return

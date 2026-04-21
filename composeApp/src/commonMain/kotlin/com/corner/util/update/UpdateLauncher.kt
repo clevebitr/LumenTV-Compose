@@ -2,10 +2,9 @@ package com.corner.util.update
 
 import com.corner.util.AppVersion
 import com.corner.util.io.Paths
-import com.corner.util.OperatingSystem
-import com.corner.util.UserDataDirProvider
-import com.corner.util.network.KtorClient
-import io.ktor.client.HttpClient
+import com.corner.util.system.OperatingSystem
+import com.corner.util.system.SysVerUtil
+import com.corner.util.net.KtorClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
@@ -41,12 +40,12 @@ class UpdateLauncher {
                 }
 
                 val currentDir = getCurrentDirectory()
-                val tempDir = System.getProperty("java.io.tmpdir")
-                val tempZipFile = File(tempDir, "LumenTV-update.zip")
+                // 使用传入的 zipFile 参数，而不是硬编码的路径
+                val tempZipFile = zipFile
 
                 val processBuilder = ProcessBuilder()
 
-                when (UserDataDirProvider.currentOs) {
+                when (SysVerUtil.currentOs) {
                     OperatingSystem.Windows -> {
                         val tempDir = System.getProperty("java.io.tmpdir")
                         val batchFile = File(tempDir, "update_${System.currentTimeMillis()}.bat")
@@ -181,7 +180,7 @@ class UpdateLauncher {
         // 设置执行权限
         private fun setExecutePermission(file: File) {
             try {
-                when (UserDataDirProvider.currentOs) {
+                when (SysVerUtil.currentOs) {
                     OperatingSystem.Linux, OperatingSystem.MacOS -> {
                         val process = ProcessBuilder("chmod", "+x", file.absolutePath).start()
                         process.waitFor()

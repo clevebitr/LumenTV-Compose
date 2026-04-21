@@ -1,7 +1,7 @@
-package com.corner.util.network
+package com.corner.util.net
 
-import com.corner.util.net.Http
-import com.github.catvod.net.OkhttpInterceptor
+import com.corner.util.net.interceptor.Interceptors.adDomainInterceptor
+import com.corner.util.net.interceptor.Interceptors.deflateInterceptor
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -15,10 +15,10 @@ fun OkHttpClient.Builder.withDefaultConfig(): OkHttpClient.Builder {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
-        .proxy(KtorClient.getProxy())  // 使用统一的代理配置
         .sslSocketFactory(Http.getSSLSocketFactory(), Http.getX509TrustManager()!!)
         .hostnameVerifier(Http.getHostnameVerifier())
-        .addInterceptor(OkhttpInterceptor())
+        .addInterceptor(deflateInterceptor)
+        .addInterceptor(adDomainInterceptor)
 }
 
 /**

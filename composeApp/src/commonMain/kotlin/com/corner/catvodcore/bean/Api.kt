@@ -17,6 +17,8 @@ data class Api(
     val doh: MutableSet<Doh> = mutableSetOf(),
     val rules: MutableSet<Rule> = mutableSetOf(),
     val flags: MutableSet<String> = mutableSetOf(),
+    val ads: List<String> = emptyList(),
+    val wallpaper: String? = null,
     @Transient
     var url: String? = "",
     @Transient

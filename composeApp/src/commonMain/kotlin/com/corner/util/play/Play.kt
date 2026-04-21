@@ -2,13 +2,13 @@ package com.corner.util.play
 
 import PotPlayer
 import cn.hutool.core.util.ZipUtil
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.catvodcore.bean.Result
 import com.corner.catvodcore.bean.v
 import com.corner.util.io.Paths
 import com.corner.ui.getPlayerSetting
 import com.corner.ui.scene.SnackBar
-import com.corner.util.Constants
+import com.corner.util.core.Constants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -123,7 +123,7 @@ fun getDefaultPlayerPath():String {
  * @param exePattern 匹配exe可执行文件的regx "mpc-hc\\X*.exe"
  */
 fun findAndExtract(dirName:String, exePattern:String): String? {
-    val resourcesDir = File(System.getProperty(Constants.resPathKey))
+    val resourcesDir = File(System.getProperty(Constants.RES_PATH_KEY))
     var exeList = resourcesDir.resolve(dirName).list(FilenameFilter { _, name -> name.lowercase().matches(Regex(exePattern)) })
     if(exeList != null && exeList.isNotEmpty()) return resourcesDir.resolve(dirName).resolve(exeList[0]).path
 

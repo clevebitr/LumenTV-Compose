@@ -1,51 +1,30 @@
 package com.corner.ui.player
 
-import com.corner.catvodcore.bean.Vod
-import com.corner.database.entity.History
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import uk.co.caprica.vlcj.player.base.MediaPlayer
-import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
-
-interface PlayerController {
-    val state: StateFlow<PlayerState>
-    var showTip: MutableStateFlow<Boolean>
-    var tip: MutableStateFlow<String>
-    var history:MutableStateFlow<History?>
-    var endingHandled: Boolean
-    var playerLoading:Boolean
-    var playerPlaying:Boolean
-    fun isPlayerInstanceReady():Boolean
-    fun load(url: String): PlayerController
-    fun onMediaPlayerReady(mediaPlayer: EmbeddedMediaPlayer)
-    fun doWithMediaPlayer(block: (MediaPlayer) -> Unit)
-    suspend fun cleanupAsync()
-    suspend fun loadURL(url: String, timeoutMillis: Long = 10000): PlayerController
-    fun play()
-    fun setAspectRatio(aspectRatio: String)
-    fun getAspectRatio(): String
-    fun play(url:String)
-    fun pause()
-    fun stop()
-    suspend fun stopAsync()
-    fun dispose()
-    fun seekTo(timestamp: Long)
-    fun setVolume(value: Float)
-    fun volumeUp()
-    fun volumeDown()
-    fun toggleSound()
+/**
+ * 播放器控制器接口
+ * 
+ * 为了保持向后兼容性，PlayerController 现在是一个组合接口，
+ * 继承了所有专用的子接口：
+ * - MediaPlayer: 媒体播放控制
+ * - PlayerStateProvider: 状态提供者
+ * - PlayerResource: 资源管理
+ * - PlayerBookmarkManager: 片头片尾管理
+ * 
+ * 新代码建议直接使用具体的子接口，以实现更好的职责分离
+ */
+interface PlayerController : 
+    MediaPlayer,
+    PlayerStateProvider,
+    PlayerResource,
+    PlayerBookmarkManager {
+    
+    /**
+     * 切换全屏状态
+     */
     fun toggleFullscreen()
-    fun speed(speed: Float)
-    fun stopForward()
-    fun fastForward()
-    fun togglePlayStatus()
-    fun init()
-    fun backward(time: String = "15s")
-    fun forward(time: String = "15s")
-    fun updateOpening(detail: Vod?)
-    fun updateEnding(detail: Vod?)
-    fun setStartEnding(opening: Long, ending: Long)
-    fun doWithPlayState(func: (MutableStateFlow<PlayerState>) -> Unit)
-    fun resetOpeningEnding()
+    
+    /**
+     * VLCJ Frame 初始化（可选）
+     */
     fun vlcjFrameInit() {}
 }

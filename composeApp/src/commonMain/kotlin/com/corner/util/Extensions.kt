@@ -5,8 +5,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import cn.hutool.core.collection.CollectionUtil
 import cn.hutool.core.util.CharUtil
-import com.corner.bean.Setting
-import com.corner.bean.SettingType
+import com.corner.util.settings.Setting
+import com.corner.util.settings.SettingType
 import com.corner.catvodcore.bean.Site
 import io.ktor.util.*
 import kotlinx.coroutines.Job

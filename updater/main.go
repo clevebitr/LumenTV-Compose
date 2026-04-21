@@ -18,7 +18,7 @@ func main() {
 	var file = flag.String("file", "", "zip file path")
 	flag.Parse()
 
-    fmt.Println("LumenTV Updater v1.0.4")
+    fmt.Println("LumenTV Updater v1.0.5")
 
 	if *path == "" {
 		fmt.Println("path is required")
@@ -29,16 +29,13 @@ func main() {
 		return
 	}
 
-	// 处理路径：如果指向 app 子目录，则使用其父目录作为目标
 	targetPath := *path
 	pathBase := filepath.Base(strings.TrimRight(*path, string(filepath.Separator)))
 	if strings.ToLower(pathBase) == "app" {
-		// 如果路径以 app 结尾，使用父目录作为目标
 		targetPath = filepath.Dir(*path)
 		fmt.Printf("Detected app directory, using parent as target: %s\n", targetPath)
 	}
 
-	// 确保路径以正确的分隔符结尾
 	if !strings.HasSuffix(targetPath, string(filepath.Separator)) {
 		targetPath = targetPath + string(filepath.Separator)
 	}
@@ -145,63 +142,83 @@ func copyFile(src, dst string) error {
 }
 
 func removeAllFiles(dir, excludePath string) error {
-    maxRetries := 5
-    retryDelay := time.Millisecond * 500
+	maxRetries := 5
+	retryDelay := time.Millisecond * 500
 
-    for attempt := 0; attempt < maxRetries; attempt++ {
-        if attempt > 0 {
-            fmt.Printf("Retry attempt %d/%d...\n", attempt+1, maxRetries)
-            time.Sleep(retryDelay)
-        }
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			fmt.Printf("Retry attempt %d/%d...\n", attempt+1, maxRetries)
+			time.Sleep(retryDelay)
+		}
 
-        err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-            if err != nil {
-                if os.IsNotExist(err) {
-                    return nil
-                }
-                return err
-            }
+		var toDelete []string
+		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
 
-            if path == dir {
-                return nil
-            }
+			if path == dir {
+				return nil
+			}
 
-            if strings.EqualFold(path, excludePath) {
-                return nil
-            }
+			if strings.EqualFold(path, excludePath) {
+				return nil
+			}
 
-            if info.IsDir() {
-                // 先尝试删除目录中的文件
-                return filepath.Walk(path, func(subPath string, subInfo os.FileInfo, subErr error) error {
-                    if subErr != nil {
-                        return nil // 忽略子目录错误
-                    }
-                    if !subInfo.IsDir() {
-                        if _, statErr := os.Stat(subPath); !os.IsNotExist(statErr) {
-                            os.Remove(subPath) // 尝试删除但不返回错误
-                        }
-                    }
-                    return nil
-                })
-            }
+			toDelete = append(toDelete, path)
+			return nil
+		})
 
-            if _, err := os.Stat(path); os.IsNotExist(err) {
-                return nil
-            }
+		if err != nil {
+			if attempt == maxRetries-1 {
+				return err
+			}
+			continue
+		}
 
-            return os.Remove(path)
-        })
+		for i := len(toDelete) - 1; i >= 0; i-- {
+			path := toDelete[i]
 
-        if err == nil {
-            return nil
-        }
+			if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+				continue
+			}
+			if strings.EqualFold(path, excludePath) {
+				continue
+			}
 
-        if attempt == maxRetries-1 {
-            return err
-        }
-    }
+			if err := os.RemoveAll(path); err != nil {
+				fmt.Printf("Warning: failed to remove %s: %v\n", path, err)
+				if attempt == maxRetries-1 {
+					return fmt.Errorf("failed to remove %s: %w", path, err)
+				}
+			} else {
+				fmt.Printf("Removed: %s\n", path)
+			}
+		}
 
-    return fmt.Errorf("failed to remove files after %d attempts", maxRetries)
+		remainingCount := 0
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || path == dir || strings.EqualFold(path, excludePath) {
+				return nil
+			}
+			remainingCount++
+			return nil
+		})
+
+		if remainingCount == 0 {
+			fmt.Println("All old files removed successfully")
+			return nil
+		}
+
+		if attempt == maxRetries-1 {
+			return fmt.Errorf("failed to remove all files after %d attempts, %d items remaining", maxRetries, remainingCount)
+		}
+	}
+
+	return fmt.Errorf("failed to remove files after %d attempts", maxRetries)
 }
 
 
@@ -214,7 +231,6 @@ func extractZip(zipPath, dest string) error {
 
     fmt.Printf("Extracting %s to %s\n", zipPath, dest)
 
-    // 检测是否有统一的根目录
     rootFolder := detectRootFolder(r)
     if rootFolder != "" {
         fmt.Printf("Will strip root folder: %s\n", rootFolder)
@@ -223,7 +239,6 @@ func extractZip(zipPath, dest string) error {
     for _, f := range r.File {
         var fpath string
         if rootFolder != "" && strings.HasPrefix(f.Name, rootFolder+"/") {
-            // 如果有统一的根目录，去掉这一层
             relativePath := f.Name[len(rootFolder)+1:]
             fpath = filepath.Join(dest, relativePath)
             fmt.Printf("Stripping root: %s -> %s\n", f.Name, relativePath)
@@ -234,7 +249,6 @@ func extractZip(zipPath, dest string) error {
             }
         }
 
-        // 跳过空路径和根目录本身
         if fpath == dest || fpath == dest+"/" || filepath.Base(fpath) == rootFolder {
             continue
         }
@@ -272,15 +286,12 @@ func extractZip(zipPath, dest string) error {
     return nil
 }
 
-// 检测ZIP文件是否有一个统一的根目录
 func detectRootFolder(r *zip.ReadCloser) string {
     folderCount := make(map[string]int)
     fileCount := 0
     rootFolders := make([]string, 0)
 
-    // 统计所有文件和文件夹
     for _, f := range r.File {
-        // 跳过目录本身
         if f.FileInfo().IsDir() && !strings.HasSuffix(f.Name, "/") {
             continue
         }
@@ -301,10 +312,8 @@ func detectRootFolder(r *zip.ReadCloser) string {
         fmt.Printf("  Folder '%s': %d files\n", folder, count)
     }
 
-    // 如果只有一个根目录，且名称与目标应用名匹配，则去除这个根目录
     if len(rootFolders) == 1 {
         rootFolder := rootFolders[0]
-        // 检查是否是应用名称相关的根目录
         if strings.Contains(strings.ToLower(rootFolder), "lumentv") ||
            strings.Contains(strings.ToLower(rootFolder), "app") {
             fmt.Printf("Detected application root folder '%s', will strip it\n", rootFolder)

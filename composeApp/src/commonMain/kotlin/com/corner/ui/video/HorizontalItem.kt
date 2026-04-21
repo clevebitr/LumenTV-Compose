@@ -14,7 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.corner.catvodcore.bean.Vod
-import com.corner.ui.components.AutoSizeImageWithLoading
+import com.corner.ui.scene.AutoSizeImageWithLoading
 import org.jetbrains.compose.resources.painterResource
 import lumentv_compose.composeapp.generated.resources.Res
 import lumentv_compose.composeapp.generated.resources.no_img

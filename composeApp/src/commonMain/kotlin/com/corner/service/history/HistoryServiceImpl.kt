@@ -35,7 +35,7 @@ class HistoryServiceImpl(
         currentEpisodeIndex: Int
     ): Episode? {
         val historyKey = Utils.getHistoryKey(detail.site?.key!!, detail.vodId)
-        log.debug("<查询历史记录>Key: {}", historyKey)
+        log.debug("查询历史记录Key: {}", historyKey)
 
         val history = Db.History.findHistory(historyKey)
 
@@ -109,11 +109,10 @@ class HistoryServiceImpl(
     }
     
     private fun handleNoHistory(detail: Vod): Episode? {
-        log.debug("[startPlay]未找到历史记录，将创建新的历史记录")
         val firstEp = detail.subEpisode.firstOrNull()
         if (firstEp != null && detail.getEpisode() == null) {
             firstEp.activated = true
-            log.debug("默认激活第一个剧集: {}", firstEp.name)
+            log.debug("默认激活: {}", firstEp.name)
         }
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -122,7 +121,7 @@ class HistoryServiceImpl(
                 detail.currentFlag.flag!!,
                 detail.getEpisode()?.name ?: detail.vodName!!
             )
-            log.debug("[StartPlay]创建新历史记录完成: {}", newHistory)
+            log.debug("创建新历史记录完成")
             controller.setControllerHistory(newHistory)
         }
         
@@ -135,7 +134,7 @@ class HistoryServiceImpl(
         currentEpisodeIndex: Int
     ): Episode? {
         log.debug(
-            "[StartPlay]找到历史记录: vodRemarks={}, vodFlag={}, position={}",
+            "找到历史记录: vodRemarks={}, vodFlag={}, position={}",
             history.vodRemarks, history.vodFlag, history.position
         )
 
@@ -144,8 +143,7 @@ class HistoryServiceImpl(
         
         val findEp = findEpisodeFromHistory(history, detail, currentEpisodeIndex)
         if (findEp != null) {
-            // 注意：这里不直接修改UI状态，由ViewModel负责
-            log.debug("[StartPlay]根据历史记录查找剧集结果: {}", findEp.name)
+            log.debug("根据历史记录查找剧集结果: {}", findEp.name)
         }
 
         controller.setControllerHistory(history)
@@ -156,7 +154,7 @@ class HistoryServiceImpl(
     private fun configurePlaybackRange(history: History) {
         val opening = history.opening ?: -1
         val ending = history.ending ?: -1
-        log.debug("[StartPlay]设置片头片尾时间: opening={}, ending={}", opening, ending)
+        log.debug("设置片头片尾时间: opening={}, ending={}", opening, ending)
         controller.setStartEnd(opening, ending)
     }
     
@@ -167,7 +165,7 @@ class HistoryServiceImpl(
                 flag.activated = flag.flag == history.vodFlag
             }
             detail.currentFlag = historyFlag
-            log.debug("[StartPlay]根据历史记录激活线路: {}", historyFlag.flag)
+            log.debug("根据历史记录激活线路: {}", historyFlag.flag)
         }
     }
     
@@ -177,7 +175,7 @@ class HistoryServiceImpl(
         currentEpisodeIndex: Int
     ): Episode? {
         log.debug(
-            "[StartPlay]根据历史记录查找剧集: vodRemarks={}, currentEpNumber={}",
+            "根据历史记录查找剧集: vodRemarks={}, currentEpNumber={}",
             history.vodRemarks, currentEpisodeIndex
         )
         

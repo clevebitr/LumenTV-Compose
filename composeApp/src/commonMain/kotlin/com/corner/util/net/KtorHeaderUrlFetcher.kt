@@ -1,4 +1,4 @@
-package com.corner.util.network
+package com.corner.util.net
 
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import com.corner.util.json.Jsons

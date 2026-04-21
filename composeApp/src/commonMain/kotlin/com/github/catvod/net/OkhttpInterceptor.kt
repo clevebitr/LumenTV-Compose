@@ -1,5 +1,6 @@
 package com.github.catvod.net
 
+import com.corner.util.core.Constants
 import okhttp3.ResponseBody
 import okio.BufferedSource
 import okio.buffer
@@ -14,7 +15,7 @@ class OkhttpInterceptor : okhttp3.Interceptor {
 
         val finalRequest = if (request.header("User-Agent").isNullOrEmpty()) {
             request.newBuilder()
-                .header("User-Agent", com.corner.util.Constants.ChromeUserAgent)
+                .header("User-Agent", Constants.CHROME_UA)
                 .build()
         } else {
             request

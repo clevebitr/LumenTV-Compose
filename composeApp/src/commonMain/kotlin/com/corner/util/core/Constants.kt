@@ -1,16 +1,11 @@
 package com.corner.util.core
 
-import androidx.compose.ui.graphics.Color
-
 object Constants {
-    val EpSize: Int = 15
+    const val EP_SIZE: Int = 15
 
-    val lightBlue = Color(94, 181, 247)
-    val darkBlue = Color(14, 22, 33)
+    const val RES_PATH_KEY = "compose.application.resources.dir"
 
-    val resPathKey = "compose.application.resources.dir"
-
-    val ChromeUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    const val CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
     val header: Map<String, String> = mapOf(
         "Accept" to "application/json, text/javascript, */*; q=0.01",

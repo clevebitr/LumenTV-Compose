@@ -1,6 +1,6 @@
 package com.corner.ui.nav.vm
 
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.database.Db
 import com.corner.database.entity.Config
 import com.corner.ui.nav.BaseViewModel

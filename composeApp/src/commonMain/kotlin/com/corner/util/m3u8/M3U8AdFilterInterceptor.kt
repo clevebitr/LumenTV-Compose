@@ -1,6 +1,6 @@
 package com.corner.util.m3u8
 
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.ui.scene.SnackBar
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -8,14 +8,10 @@ import org.slf4j.LoggerFactory
 import java.net.URI
 
 
-private val log = LoggerFactory.getLogger("M3U8AdFilterInterceptor")
+private val log = LoggerFactory.getLogger("M3U8Interceptor")
 
 class M3U8AdFilterInterceptor {
     class Interceptor() : okhttp3.Interceptor {
-
-        private val config = SettingStore.getM3U8FilterConfig() // 主动获取最新配置
-        private val filter = M3U8Filter(config)
-
         override fun intercept(chain: okhttp3.Interceptor.Chain): Response {
             val request = chain.request()
             val url = request.url.toString()
@@ -42,8 +38,11 @@ class M3U8AdFilterInterceptor {
                 }
             }
 
+            // 2. 每次请求时获取配置并创建过滤器
+            val config = SettingStore.getM3U8FilterConfig()
+            val filter = M3U8Filter(config)
+            
             val filteredContent = if (SettingStore.isAdFilterEnabled()) {
-                // 2. 广告过滤处理
                 filter.safelyProcessM3u8(url, absolutePathContent)
             } else {
                 absolutePathContent

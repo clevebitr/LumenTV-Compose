@@ -23,7 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.enum.Menu
 import com.corner.catvodcore.viewmodel.DetailFromPage
@@ -42,7 +42,7 @@ import com.corner.util.FirefoxGray
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.corner.bean.SettingType
+import com.corner.util.settings.SettingType
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("RootContent")

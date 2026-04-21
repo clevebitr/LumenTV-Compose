@@ -1,19 +1,18 @@
 package com.corner.init
 
-import cn.hutool.system.SystemUtil
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
-import com.corner.util.Constants
-import com.corner.util.SysVerUtil
-import com.corner.util.thisLogger
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
+import com.corner.util.core.Constants
+import com.corner.util.system.SysVerUtil
 import com.corner.util.trimBlankChar
 import org.apache.commons.lang3.StringUtils
+import org.slf4j.LoggerFactory
 import uk.co.caprica.vlcj.factory.discovery.provider.DiscoveryDirectoryProvider
 import java.io.File
 
 
 class CustomDirectoryDiscovery:DiscoveryDirectoryProvider {
-    private val log = thisLogger()
+    private val log = LoggerFactory.getLogger("CustomDirectory")
     override fun priority(): Int {
         return 99999
     }
@@ -21,11 +20,11 @@ class CustomDirectoryDiscovery:DiscoveryDirectoryProvider {
 
     override fun directories(): Array<String> {
         val arrayOf = mutableListOf<String>()
-        System.getProperty(Constants.resPathKey)?.run {
+        System.getProperty(Constants.RES_PATH_KEY)?.run {
             log.debug("resPath: $this")
             arrayOf.add(this.trimBlankChar() + "/lib")
         }
-        val debugPath = File(System.getProperty("user.dir")).resolve("src/desktopMain/appResources/${getOsArchName()}/lib")
+        val debugPath = File(System.getProperty("user.dir")).resolve("src/desktopMain/appResources/${SysVerUtil.getOsArchName()}/lib")
         if(StringUtils.isNotBlank(debugPath.toString())){
             arrayOf.add(debugPath.toString())
         }
@@ -37,22 +36,6 @@ class CustomDirectoryDiscovery:DiscoveryDirectoryProvider {
         }
         log.info("自定义vlc播放器路径：$arrayOf")
         return arrayOf.toTypedArray()
-    }
-
-    private fun getOsArchName():String{
-        val osName = SysVerUtil.getOsName()
-        return if(SysVerUtil.getOsName() == SysVerUtil.System.WINDOWS) "${osName.name.lowercase()}-${getArchName()}"
-        else "${osName.name.lowercase()}-${SystemUtil.getOsInfo().arch}"
-    }
-
-    private fun getArchName():String {
-        System.getProperty("os.arch").lowercase().let {
-            return when {
-                "x86" in it || "x64" in it || "amd64" in it -> "x64"
-                "arm" in it || "aarch" in it -> "arm64"
-                else -> "x64"
-            }
-        }
     }
 
     override fun supported(): Boolean {

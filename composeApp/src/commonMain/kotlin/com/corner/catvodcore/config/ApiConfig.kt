@@ -1,17 +1,18 @@
 package com.corner.catvodcore.config
 
 import com.corner.catvodcore.viewmodel.SiteViewModel
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.catvodcore.bean.Rule
 import com.corner.catvodcore.bean.Site
 import com.corner.catvodcore.bean.Api
+import com.corner.catvodcore.config.ApiConfig.api
 import com.corner.catvodcore.enum.ConfigType
 import com.corner.catvodcore.loader.JarLoader
 import com.corner.util.net.Http
 import com.corner.util.json.Jsons
 import com.corner.util.json.cleanJsonComments
-import com.corner.util.net.Urls
+import com.corner.util.io.Urls
 import com.corner.catvodcore.viewmodel.GlobalAppState
 import com.corner.database.Db
 import com.corner.database.entity.Config
@@ -27,7 +28,7 @@ import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Paths
-import com.corner.util.NoStackTraceException
+import com.corner.util.core.NoStackTraceException
 import com.github.catvod.bean.Doh
 
 private val log = LoggerFactory.getLogger("apiConfig")
@@ -149,18 +150,36 @@ object ApiConfig {
         return str
     }
 
-
+    /**
+     * Proxy
+     */
     fun initProxy() {
         Http.setProxyHosts(getRuleByName("proxy")?.hosts)
     }
 
-    // Init Doh
+    /**
+     * Doh
+     */
     fun initDoh() {
         val dohEnabled = SettingStore.getSettingItem(SettingType.DOH_ENABLED).toBoolean()
         if (dohEnabled) {
             val serverName = SettingStore.getSettingItem(SettingType.DOH_SERVER)
             val doh = Doh.defaultDoh().find { it.name == serverName }
             doh?.let { Http.setDoh(it) }
+        }
+    }
+
+    /**
+     * AdBlocker
+     */
+    fun initAdBlocker(adDomains: List<String>) {
+        if (adDomains.isNotEmpty()) {
+            // 使用 Http 类中的单例拦截器
+            val interceptor = Http.getAdDomainInterceptor()
+            interceptor.setAdDomains(adDomains)
+            log.info("Initialized with ${adDomains.size} ad domains")
+        } else {
+            log.debug("No ad domains configured")
         }
     }
 
@@ -208,6 +227,7 @@ object ApiConfig {
 fun Api.init() {
     ApiConfig.initProxy()
     ApiConfig.initDoh()
+    ApiConfig.initAdBlocker(api.ads)
     initSite()
 }
 

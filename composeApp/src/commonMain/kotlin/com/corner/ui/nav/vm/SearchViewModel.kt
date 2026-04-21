@@ -1,7 +1,7 @@
 package com.corner.ui.nav.vm
 
 import com.corner.catvodcore.viewmodel.SiteViewModel
-import com.corner.bean.SettingStore
+import com.corner.util.settings.SettingStore
 import com.corner.catvodcore.bean.Collect
 import com.corner.catvodcore.config.ApiConfig
 import com.corner.catvodcore.viewmodel.GlobalAppState
@@ -122,7 +122,8 @@ class SearchViewModel : BaseViewModel() {
                     val completedCount = _state.value.searchCompleteSites.size
                     val totalCount = _state.value.searchableSites.filter { it.searchable == 1 }.size
                     SnackBar.postMsg(
-                        "搜索进度: $completedCount/$totalCount - ${site.name}",
+                        priority = 1,
+                        msg = "搜索进度: $completedCount/$totalCount - ${site.name}",
                         key = "search_progress",
                         type = SnackBar.MessageType.INFO
                     )

@@ -2,7 +2,7 @@ package com.corner.ui.nav.data
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import com.corner.bean.HotData
+import com.corner.util.HotData
 import com.corner.catvodcore.bean.Site
 import com.corner.catvodcore.bean.Vod
 import com.corner.ui.search.SearchPageType

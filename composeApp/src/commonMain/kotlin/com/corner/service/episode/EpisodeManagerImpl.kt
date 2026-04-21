@@ -4,7 +4,7 @@ import com.corner.catvodcore.bean.Episode
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Vod.Companion.getPage
 import com.corner.ui.player.PlayerLifecycleManager
-import com.corner.util.Constants
+import com.corner.util.core.Constants
 
 /**
  * EpisodeManager实现类
@@ -36,7 +36,7 @@ class EpisodeManagerImpl : EpisodeManager {
             
             // 计算总分组数
             val totalEpisodes = detail.currentFlag.episodes.size
-            val totalPages = (totalEpisodes + Constants.EpSize - 1) / Constants.EpSize
+            val totalPages = (totalEpisodes + Constants.EP_SIZE - 1) / Constants.EP_SIZE
             
             // 检查是否有更多分组
             if (nextTabIndex >= totalPages) {
@@ -44,8 +44,8 @@ class EpisodeManagerImpl : EpisodeManager {
             }
             
             // 切换到下一分组
-            val start = nextTabIndex * Constants.EpSize
-            val end = minOf(start + Constants.EpSize, totalEpisodes)
+            val start = nextTabIndex * Constants.EP_SIZE
+            val end = minOf(start + Constants.EP_SIZE, totalEpisodes)
             val newSubEpisodes = detail.currentFlag.episodes.subList(start, end)
             
             val newFirstEp = newSubEpisodes.firstOrNull() ?: return null
@@ -85,13 +85,13 @@ class EpisodeManagerImpl : EpisodeManager {
             // 切换到下一分组
             val nextTabIndex = detail.currentTabIndex + 1
             val totalEpisodesCount = detail.currentFlag.episodes.size
-            val totalPages = (totalEpisodesCount + Constants.EpSize - 1) / Constants.EpSize
+            val totalPages = (totalEpisodesCount + Constants.EP_SIZE - 1) / Constants.EP_SIZE
             
             if (nextTabIndex >= totalPages) {
                 return
             }
             
-            val newFirstEp = detail.currentFlag.episodes[nextTabIndex * Constants.EpSize]
+            val newFirstEp = detail.currentFlag.episodes[nextTabIndex * Constants.EP_SIZE]
             onPlayEpisode(detail, newFirstEp)
         } else {
             // 播放当前分组的下一集
@@ -101,7 +101,7 @@ class EpisodeManagerImpl : EpisodeManager {
     }
     
     private fun shouldSwitchToNextGroup(currentIndex: Int): Boolean {
-        return currentIndex >= Constants.EpSize - 1
+        return currentIndex >= Constants.EP_SIZE - 1
     }
     
     override fun chooseEpisodeBatch(
@@ -109,7 +109,7 @@ class EpisodeManagerImpl : EpisodeManager {
         index: Int,
         currentEpUrl: String?
     ): Vod {
-        val newTabIndex = index / Constants.EpSize
+        val newTabIndex = index / Constants.EP_SIZE
         val newSubEpisodes = detail.currentFlag.episodes.getPage(newTabIndex).toMutableList()
         
         // 恢复激活状态
@@ -139,21 +139,13 @@ class EpisodeManagerImpl : EpisodeManager {
         onOpenUri: (String) -> Unit,
         onPlayEpisode: (Vod, Episode) -> Unit
     ) {
-        // 检查是否为下载链接
-        val isDownloadLink = com.corner.util.net.Utils.isDownloadLink(episode.url)
-        
-        if (isDownloadLink) {
-            onOpenUri(episode.url)
-            return
-        }
-        
         // 更新剧集激活状态
         val updatedDetail = updateEpisodeActivationStates(detail, episode)
         
         // 如果需要，停止当前播放
         stopCurrentPlaybackIfNeeded(playerTypeId, lifecycleManager)
         
-        // 播放新剧集
+        // 播放新剧集（包括磁力链接）
         onPlayEpisode(updatedDetail, episode)
     }
     

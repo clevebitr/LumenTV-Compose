@@ -17,5 +17,7 @@ data class VideoScreenState(
     var isRunning: Boolean = false,
     val prompt:String = "",
     val dirPaths:MutableList<String> = mutableListOf(), // 当前目录路径
-    var ref:Int = 0
+    var ref:Int = 0,
+    var showPlaywrightDownloadDialog: Boolean = false,
+    var playwrightSpiderName: String = ""
 )

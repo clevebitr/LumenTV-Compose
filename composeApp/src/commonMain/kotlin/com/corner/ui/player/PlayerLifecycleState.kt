@@ -8,7 +8,7 @@ enum class PlayerLifecycleState {
     /** 初始状态，播放器未初始化 */
     Idle,
 
-    /** 正在初始化播放器 */
+    /** 正在初始化播放器（包含同步/异步初始化） */
     Initializing,
 
     /** 播放器初始化完成，可以加载媒体 */
@@ -26,21 +26,12 @@ enum class PlayerLifecycleState {
     /** 已暂停 */
     Paused,
 
-    /** 播放结束 */
+    /** 播放结束（包含同步/异步停止） */
     Ended,
-
-    /** 正在清理资源 */
-    Cleaning,
 
     /** 已释放 */
     Released,
 
     /** 发生错误 */
-    Error,
-
-    /** 异步初始化 */
-    Initializing_Sync,
-
-    /** 异步停止播放 */
-    Ended_Async
+    Error
 }

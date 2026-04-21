@@ -23,13 +23,13 @@ class TvAvTransportService : AbstractAVTransportService() {
         currentURI: String,
         currentURIMetaData: String
     ) {
+        log.info("setAvTransportURI instance id: $instanceId currentURI: $currentURI")
 
         runBlocking {
-            GlobalAppState.DLNAUrl.emit("")
+            // 直接设置新的URL，不要先清空
             GlobalAppState.DLNAUrl.emit(currentURI)
             SnackBar.postMsg("投屏：$currentURI", type = SnackBar.MessageType.INFO)
         }
-        log.info("setAvTransportURI instance id: $instanceId currentURI: $currentURI currentURIMetaData: $currentURIMetaData")
     }
 
     override fun setNextAVTransportURI(p0: UnsignedIntegerFourBytes?, p1: String?, p2: String?) {
@@ -130,6 +130,17 @@ class TvAvTransportService : AbstractAVTransportService() {
         if (controller != null && !controller.isReleased()) {
             controller.stop()
         }
+
+        // 停止投屏时，结束DLNA会话并清理状态
+        runBlocking {
+            GlobalAppState.DLNAUrl.emit("")
+        }
+
+        // 通过回调通知UI层停止投屏
+        GlobalAppState.onDLNAStop?.invoke()
+
+        SnackBar.postMsg("投屏已停止", type = SnackBar.MessageType.INFO)
+        log.info("DLNA投屏已停止")
     }
 
     override fun play(p0: UnsignedIntegerFourBytes?, p1: String?) {
@@ -165,6 +176,7 @@ class TvAvTransportService : AbstractAVTransportService() {
                     // 解析 HH:mm:ss 格式的时间
                     targetTimeMs = parseTimeStringToMillis(p2 ?: "00:00:00")
                 }
+
                 else -> {
                     val timeInSeconds = p2?.toDoubleOrNull()
                     if (timeInSeconds != null) {
@@ -221,12 +233,14 @@ class TvAvTransportService : AbstractAVTransportService() {
                     val seconds = parts[2].toLongOrNull() ?: 0
                     (hours * 3600 + minutes * 60 + seconds) * 1000
                 }
+
                 2 -> {
                     // mm:ss 格式
                     val minutes = parts[0].toLongOrNull() ?: 0
                     val seconds = parts[1].toLongOrNull() ?: 0
                     (minutes * 60 + seconds) * 1000
                 }
+
                 else -> {
                     // 只有秒数
                     ((timeString.toDoubleOrNull() ?: (0.0 * 1000))).toLong()

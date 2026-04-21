@@ -6,7 +6,9 @@ package com.github.catvod.net
  * 后端抓取使用
  */
 
-import com.corner.util.m3u8.M3U8AdFilterInterceptor
+import com.corner.util.net.interceptor.Interceptors.deflateInterceptor
+import com.corner.util.net.interceptor.Interceptors.adDomainInterceptor
+import com.corner.util.net.interceptor.Interceptors.m3u8AdInterceptor
 import com.github.catvod.crawler.Spider.Companion.safeDns
 import com.github.catvod.crawler.SpiderDebug
 import com.github.catvod.crawler.SpiderDebug.log
@@ -191,11 +193,9 @@ object OkHttp {
     @JvmStatic
     val builder: OkHttpClient.Builder
         get() = OkHttpClient.Builder()
-            // 重要：不要直接设置 .proxy()，让 ProxySelector 决定是否需要代理
-            // ProxySelector 会自动排除本地地址（127.0.0.1, localhost 等）
-            // .proxy(getProxy())  // ❌ 这会绕过 ProxySelector，导致本地请求也走代理
-            .addInterceptor(OkhttpInterceptor())
-            .addInterceptor(M3U8AdFilterInterceptor.Interceptor())
+            .addInterceptor(deflateInterceptor)
+            .addInterceptor(adDomainInterceptor)
+            .addInterceptor(m3u8AdInterceptor)
             .dns(dns())
             .connectTimeout(2, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
@@ -203,7 +203,6 @@ object OkHttp {
             .sslSocketFactory(SSLSocketClient.sSLSocketFactory, SSLSocketClient.x509TrustManager)
             .hostnameVerifier(SSLSocketClient.hostnameVerifier)
             .apply {
-                // 配置Dispatcher以控制并发
                 dispatcher(okhttp3.Dispatcher().apply {
                     maxRequests = 64
                     maxRequestsPerHost = 5

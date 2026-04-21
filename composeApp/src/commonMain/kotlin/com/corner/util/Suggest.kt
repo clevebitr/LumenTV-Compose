@@ -1,4 +1,4 @@
-package com.corner.bean
+package com.corner.util
 
 import com.corner.util.json.Jsons
 import kotlinx.serialization.Serializable

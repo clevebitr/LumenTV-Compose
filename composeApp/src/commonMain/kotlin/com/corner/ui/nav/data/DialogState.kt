@@ -38,7 +38,6 @@ object DialogState {
 
     // 切换视频时重置标志位
     fun resetBrowserChoice() {
-        log.debug("resetBrowserChoice,userChoseOpenInBrowser -> {}", userChoseOpenInBrowser)
         userChoseOpenInBrowser = false
     }
 }

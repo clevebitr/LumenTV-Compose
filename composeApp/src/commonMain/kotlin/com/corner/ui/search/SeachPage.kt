@@ -24,10 +24,10 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowScope
-import com.corner.bean.HotData
-import com.corner.bean.SearchHistoryCache
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
+import com.corner.util.HotData
+import com.corner.util.settings.SearchHistoryCache
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.ui.nav.vm.SearchViewModel
 import com.corner.ui.scene.ControlBar
 

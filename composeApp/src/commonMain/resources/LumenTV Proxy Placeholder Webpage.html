@@ -302,21 +302,46 @@
                 </div>
                 
                 <div class="api-card">
-                    <h3><span class="method get">GET</span> <span class="url">/postMsg</span></h3>
-                    <p class="description">向应用发送弹窗消息</p>
+                    <h3><span class="method get">GET</span> <span class="method post">POST</span> <span class="url">/postMsg</span></h3>
+                    <p class="description">向应用发送弹窗消息（支持类型和优先级）</p>
                     
                     <div class="params">
-                        <h4>请求参数</h4>
+                        <h4>请求参数（GET 或 POST）</h4>
                         <div class="param-item">
                             <span class="param-name">msg</span>
                             <span class="param-type">string</span>
                             <span class="param-desc">消息内容（必填）</span>
                         </div>
+                        <div class="param-item">
+                            <span class="param-name">type</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">消息类型：INFO, SUCCESS, WARNING, ERROR（可选，默认 INFO）</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-name">priority</span>
+                            <span class="param-type">integer</span>
+                            <span class="param-desc">优先级，数字越大越优先显示（可选，默认 0）</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-name">key</span>
+                            <span class="param-type">string</span>
+                            <span class="param-desc">唯一标识符，用于更新或替换已有消息（可选）</span>
+                        </div>
                     </div>
                     
                     <div class="example">
-                        <h4>请求示例</h4>
-                        <code>GET /postMsg?msg=操作成功</code>
+                        <h4>GET 请求示例</h4>
+                        <code>GET /postMsg?msg=操作成功&type=SUCCESS&priority=1</code>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>POST 请求示例</h4>
+                        <code>POST /postMsg<br>{<br>&nbsp;&nbsp;"msg": "下载完成",<br>&nbsp;&nbsp;"type": "SUCCESS",<br>&nbsp;&nbsp;"priority": 2,<br>&nbsp;&nbsp;"key": "download_123"<br>}</code>
+                    </div>
+                    
+                    <div class="example">
+                        <h4>响应示例</h4>
+                        <code>{<br>&nbsp;&nbsp;"success": true,<br>&nbsp;&nbsp;"message": "消息已发送",<br>&nbsp;&nbsp;"data": {<br>&nbsp;&nbsp;&nbsp;&nbsp;"content": "下载完成",<br>&nbsp;&nbsp;&nbsp;&nbsp;"type": "SUCCESS",<br>&nbsp;&nbsp;&nbsp;&nbsp;"priority": 2,<br>&nbsp;&nbsp;&nbsp;&nbsp;"key": "download_123"<br>&nbsp;&nbsp;}<br>}</code>
                     </div>
                 </div>
                 

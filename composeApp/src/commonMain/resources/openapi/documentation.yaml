@@ -1,0 +1,336 @@
+openapi: 3.0.0
+info:
+  title: LumenTV Compose API
+  description: LumenTV Compose 本地服务器 API 文档
+  version: 1.1.6
+  contact:
+    name: LumenTV Team
+    url: https://github.com/clevebitr/LumenTV-Compose
+
+servers:
+  - url: http://127.0.0.1:9978
+    description: 本地开发服务器
+
+paths:
+  /health:
+    get:
+      summary: 健康检查
+      description: 检查服务器是否正常运行
+      tags:
+        - System
+      responses:
+        '200':
+          description: 服务器正常运行
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/progress/show:
+    get:
+      summary: 显示加载指示器
+      description: 显示全局加载指示器，可选显示提示消息
+      tags:
+        - UI
+      parameters:
+        - name: message
+          in: query
+          required: false
+          description: 可选的提示消息
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 加载指示器已显示
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "加载指示器已显示"
+
+  /api/progress/hide:
+    get:
+      summary: 隐藏加载指示器
+      description: 隐藏全局加载指示器
+      tags:
+        - UI
+      responses:
+        '200':
+          description: 加载指示器已隐藏
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "加载指示器已隐藏"
+
+  /postMsg:
+    get:
+      summary: 发送弹窗消息 (GET)
+      description: 通过 GET 请求发送弹窗消息到客户端
+      tags:
+        - Notification
+      parameters:
+        - name: msg
+          in: query
+          required: true
+          description: 消息内容
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: 消息类型 (INFO, WARNING, ERROR, SUCCESS)
+          schema:
+            type: string
+            default: INFO
+        - name: priority
+          in: query
+          required: false
+          description: 消息优先级
+          schema:
+            type: integer
+            default: 0
+        - name: key
+          in: query
+          required: false
+          description: 消息唯一标识
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 消息已发送
+          content:
+            text/plain:
+              schema:
+                type: string
+        '207':
+          description: 消息不可为空
+
+  /proxy:
+    get:
+      summary: 通用代理
+      description: 代理网络请求，支持视频流等资源的代理转发
+      tags:
+        - Proxy
+      parameters:
+        - name: 动态参数
+          in: query
+          description: 由爬虫逻辑处理的动态参数
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 代理响应
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '302':
+          description: 重定向
+        '500':
+          description: 代理处理失败
+
+  /video/proxy:
+    get:
+      summary: 视频代理
+      description: 专门为 Web 播放器设计的视频代理接口，支持 Range 请求
+      tags:
+        - Proxy
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: 要代理的视频 URL
+          schema:
+            type: string
+        - name: Range
+          in: header
+          required: false
+          description: HTTP Range 请求头
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          description: Referer 请求头
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 视频流
+          content:
+            video/*:
+              schema:
+                type: string
+                format: binary
+            application/vnd.apple.mpegurl:
+              schema:
+                type: string
+        '206':
+          description: 部分内容（Range 请求）
+        '400':
+          description: 缺少 URL 参数或 URL 格式无效
+        '502':
+          description: 上游服务器错误
+
+  /proxy/m3u8:
+    get:
+      summary: M3U8 代理
+      description: 代理 M3U8 播放列表文件
+      tags:
+        - Proxy
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: M3U8 文件的 URL（需要 URL 编码）
+          schema:
+            type: string
+      responses:
+        '200':
+          description: M3U8 文件内容
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+        '400':
+          description: 缺少 URL 参数或 URL 不合法
+        '500':
+          description: 代理请求失败
+
+  /proxy/cached_m3u8:
+    get:
+      summary: 缓存的 M3U8 代理
+      description: 返回已缓存的 M3U8 文件内容
+      tags:
+        - Proxy
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: 缓存 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 缓存的 M3U8 内容
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+        '400':
+          description: 缺少缓存 ID
+        '404':
+          description: 缓存已过期或不存在
+
+  /api/playwright/status:
+    get:
+      summary: Playwright 浏览器状态
+      description: 获取 Playwright 浏览器的可用性和配置信息
+      tags:
+        - System
+      responses:
+        '200':
+          description: Playwright 状态信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+                    description: 浏览器是否可用
+                  path:
+                    type: string
+                    description: 浏览器可执行文件路径
+                  cacheDir:
+                    type: string
+                    description: 浏览器缓存目录
+                  tempDir:
+                    type: string
+                    description: 临时目录
+
+  /ws/video-events:
+    get:
+      summary: WebSocket 视频事件
+      description: WebSocket 端点，用于 Web 播放器事件通信
+      tags:
+        - WebSocket
+      responses:
+        '101':
+          description: WebSocket 连接建立成功
+      x-websocket-protocol: ws
+      x-websocket-messages:
+        - direction: client-to-server
+          description: 客户端发送的消息
+          messages:
+            - PLAYBACK_STARTED: 视频播放开始
+            - PLAYBACK_FINISHED: 视频播放完成
+
+components:
+  schemas:
+    MessageRequest:
+      type: object
+      required:
+        - msg
+      properties:
+        msg:
+          type: string
+          description: 消息内容
+        type:
+          type: string
+          enum: [INFO, WARNING, ERROR, SUCCESS]
+          default: INFO
+          description: 消息类型
+        priority:
+          type: integer
+          default: 0
+          description: 消息优先级
+        key:
+          type: string
+          description: 消息唯一标识
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            content:
+              type: string
+            type:
+              type: string
+            priority:
+              type: integer
+            key:
+              type: string
+
+tags:
+  - name: System
+    description: 系统相关接口
+  - name: UI
+    description: UI 控制接口
+  - name: Notification
+    description: 消息通知接口
+  - name: Proxy
+    description: 代理相关接口
+  - name: WebSocket
+    description: WebSocket 通信接口

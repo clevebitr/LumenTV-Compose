@@ -2,12 +2,17 @@ package com.corner.server
 
 import com.corner.server.plugins.configureRouting
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.websocket.*
 import io.netty.handler.codec.http.HttpServerCodec
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.seconds
 
 private val log = LoggerFactory.getLogger("KtorD")
 
@@ -92,9 +97,20 @@ object KtorD {
                 log.info("KtorD started successfully on port: {}", actualPort)
                 break
             } catch (e: Exception) {
-                log.debug("Port {} is unavailable, trying next... ({})", tryPort, e.message)
-                ++tryPort
-                server?.stop()
+                // 只处理端口占用异常，其他异常直接抛出
+                val isPortOccupied = e.message?.contains("BindException") == true || 
+                                   e.message?.contains("Address already in use") == true ||
+                                   e.cause?.javaClass?.name?.contains("BindException") == true
+                
+                if (isPortOccupied) {
+                    log.debug("Port {} is occupied, trying next port...", tryPort)
+                    ++tryPort
+                    server?.stop()
+                } else {
+                    // 非端口占用错误，直接抛出
+                    log.error("KtorD 启动失败（非端口占用）", e)
+                    throw e
+                }
             }
         } while (tryPort < MAX_PORT)
         
@@ -118,6 +134,21 @@ object KtorD {
  * KtorD 模块
  */
 private fun Application.module() {
+    install(ContentNegotiation) {
+        json(Json {
+            prettyPrint = true
+            isLenient = true
+            ignoreUnknownKeys = true
+        })
+    }
+    
+    install(WebSockets) {
+        pingPeriod = null
+        timeout = 15.seconds
+        maxFrameSize = Long.MAX_VALUE
+        masking = false
+    }
+    
     // 跨域
     install(CORS) {
         allowMethod(HttpMethod.Options)
@@ -128,11 +159,17 @@ private fun Application.module() {
         allowHeader(HttpHeaders.Accept)
         allowHeader(HttpHeaders.Range)
         allowHeader("X-Requested-With")
+        allowHeader("Upgrade")  // WebSocket 升级请求
+        allowHeader("Connection")
+        allowHeader("Sec-WebSocket-Key")
+        allowHeader("Sec-WebSocket-Version")
+        allowHeader("Sec-WebSocket-Extensions")
         allowNonSimpleContentTypes = true
-        anyHost() // 允许所有主机访问（开发环境）
-        allowCredentials = false // 设置为false避免与具体Origin冲突
+
+        anyHost()
+        
+        allowCredentials = false
     }
 
-    // 路由
     configureRouting()
 }

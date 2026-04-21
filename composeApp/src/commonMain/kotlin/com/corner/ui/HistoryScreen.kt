@@ -36,7 +36,7 @@ import com.corner.database.entity.History
 import com.corner.ui.nav.vm.HistoryViewModel
 import com.corner.ui.scene.BackRow
 import com.corner.ui.scene.ControlBar
-import com.corner.ui.components.AutoSizeImageWithLoading
+import com.corner.ui.scene.AutoSizeImageWithLoading
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import lumentv_compose.composeapp.generated.resources.Res

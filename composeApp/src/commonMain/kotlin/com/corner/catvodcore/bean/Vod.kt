@@ -3,7 +3,7 @@ package com.corner.catvodcore.bean
 import com.corner.util.net.Utils
 import com.corner.database.entity.History
 import com.corner.ui.scene.SnackBar
-import com.corner.util.Constants
+import com.corner.util.core.Constants
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -102,8 +102,8 @@ data class Vod(
 
         fun List<Episode>.getPage(index: Int): MutableList<Episode> {
             val list = this.subList(
-                index * Constants.EpSize,
-                if (index * Constants.EpSize + Constants.EpSize > size) size else index * Constants.EpSize + Constants.EpSize
+                index * Constants.EP_SIZE,
+                if (index * Constants.EP_SIZE + Constants.EP_SIZE > size) size else index * Constants.EP_SIZE + Constants.EP_SIZE
             ).toMutableList()
             return list
         }
@@ -169,7 +169,7 @@ data class Vod(
 
         episode.activated = true
         val indexOf = currentFlag.episodes.indexOf(episode)
-        currentTabIndex = indexOf / Constants.EpSize
+        currentTabIndex = indexOf / Constants.EP_SIZE
         subEpisode = currentFlag.episodes.getPage(currentTabIndex)
         log.debug("最终选中剧集：name=${episode.name}, number=${episode.number}, tabIndex=$currentTabIndex")
         return episode

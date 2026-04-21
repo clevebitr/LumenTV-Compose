@@ -2,7 +2,7 @@ package com.corner.util.io
 
 import com.corner.ui.scene.SnackBar
 import com.corner.util.system.OperatingSystem
-import com.corner.util.system.UserDataDirProvider
+import com.corner.util.system.SysVerUtil
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -14,7 +14,7 @@ object Paths {
     private val userDataDir = getUserDataDir()
 
     private fun getUserDataDir() = run {
-        when (UserDataDirProvider.currentOs) {
+        when (SysVerUtil.currentOs) {
             OperatingSystem.Windows -> File(System.getenv("AppData"), "$APP_NAME/cache")
             OperatingSystem.Linux -> File(System.getProperty("user.home"), ".cache/$APP_NAME")
             OperatingSystem.MacOS -> File(System.getProperty("user.home"), "Library/Caches/$APP_NAME")
@@ -92,5 +92,13 @@ object Paths {
 
     fun logPath():File{
         return root().resolve("log")
+    }
+
+    fun playwrightBrowsers(): File {
+        return userDataRoot().resolve("playwright-browsers").resolve("chromium-1097").check()
+    }
+
+    fun playwrightTemp(): File {
+        return userDataRoot().resolve("temp").check()
     }
 }

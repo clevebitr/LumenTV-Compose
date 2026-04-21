@@ -39,15 +39,13 @@ class PlayerLifecycleManager(
 
                 // 执行状态对应的操作
                 when (newState) {
-                    PlayerLifecycleState.Cleaning -> cleanupInternal()
                     PlayerLifecycleState.Released -> releaseInternal()
                     PlayerLifecycleState.Paused -> stopInternal()
-                    PlayerLifecycleState.Initializing_Sync -> initializeSyncInternal()
+                    PlayerLifecycleState.Initializing -> initializeSyncInternal()
                     PlayerLifecycleState.Ready -> readyInternal()
                     PlayerLifecycleState.Loading -> loadingInternal()
                     PlayerLifecycleState.Playing -> playingInternal()
                     PlayerLifecycleState.Ended -> endedInternal()
-                    PlayerLifecycleState.Ended_Async -> endedInternalAsync()
                     else -> Result.success(Unit)
                 }
             } catch (e: Exception) {
@@ -79,7 +77,7 @@ class PlayerLifecycleManager(
     /**
      * 同步初始化
      */
-    suspend fun initializeSync(): Result<Unit> = transitionTo(PlayerLifecycleState.Initializing_Sync)
+    suspend fun initializeSync(): Result<Unit> = transitionTo(PlayerLifecycleState.Initializing)
 
     private suspend fun initializeSyncInternal(): Result<Unit> {
         return withContext(lifecycleDispatcher) {
@@ -96,17 +94,15 @@ class PlayerLifecycleManager(
 
 
     /**
-     * 异步停止播放,用于清理资源
+     * 清理资源
      */
-    suspend fun cleanup(): Result<Unit> = transitionTo(PlayerLifecycleState.Cleaning)
-
-    private suspend fun cleanupInternal(): Result<Unit> {
+    suspend fun cleanup(): Result<Unit> {
         return withContext(lifecycleDispatcher) {
             try {
                 controller.cleanupAsync()
                 Result.success(Unit)
             } catch (e: Exception) {
-                log.error("停止播放失败:", e)
+                log.error("清理资源失败:", e)
                 Result.failure(e)
             }
         }
@@ -130,6 +126,10 @@ class PlayerLifecycleManager(
     }
 
     suspend fun ended(): Result<Unit> = transitionTo(PlayerLifecycleState.Ended)
+    
+    /**
+     * 停止播放媒体
+     */
     private suspend fun endedInternal(): Result<Unit> {
         return withContext(lifecycleDispatcher) {
             try {
@@ -143,20 +143,6 @@ class PlayerLifecycleManager(
         }
     }
 
-
-    suspend fun endedAsync(): Result<Unit> = transitionTo(PlayerLifecycleState.Ended_Async)
-    private suspend fun endedInternalAsync(): Result<Unit> {
-        return withContext(lifecycleDispatcher) {
-            try {
-                log.debug("<LifecycleManager> -- 异步停止播放媒体")
-                controller.stopAsync()
-                Result.success(Unit)
-            } catch (e: Exception) {
-                log.error("播放结束失败", e)
-                Result.failure(e)
-            }
-        }
-    }
 
     /**
      * 完全释放资源
@@ -228,9 +214,7 @@ class PlayerLifecycleManager(
                     log.debug("播放器已经在播放状态")
                     return@withContext Result.success(Unit)
                 }
-                
-                // 调用 Controller 的 play() 方法开始播放
-                log.debug("调用 Controller.play() 开始播放")
+
                 controller.play()
                 
                 Result.success(Unit)
@@ -243,84 +227,122 @@ class PlayerLifecycleManager(
 
 
     /**
+     * 准备播放器到 Ready 状态（自动处理各种状态转换）
+     * 
+     * 这是 InniePlayerStrategy 的便捷方法，封装了复杂的状态转换逻辑
+     * 根据当前状态自动选择最优的转换路径
+     */
+    suspend fun prepareForPlayback(): Result<Unit> {
+        return when (lifecycleState.value) {
+            PlayerLifecycleState.Ready -> {
+                log.debug("播放器已处于 Ready 状态，无需准备")
+                Result.success(Unit)
+            }
+            PlayerLifecycleState.Playing -> {
+                log.debug("从 Playing 状态准备播放")
+                val stopResult = stop()
+                if (stopResult.isFailure) return stopResult
+                
+                val endedResult = ended()
+                if (endedResult.isFailure) return endedResult
+                
+                ready()
+            }
+            PlayerLifecycleState.Loading, 
+            PlayerLifecycleState.Ended -> {
+                log.debug("从 {} 状态准备播放", lifecycleState.value)
+                ready()
+            }
+            PlayerLifecycleState.Error -> {
+                log.debug("从 Error 状态恢复并准备播放")
+                recoverFromError()
+            }
+            PlayerLifecycleState.Initialized -> {
+                log.debug("从 Initialized 状态准备播放")
+                val loadingResult = loading()
+                if (loadingResult.isFailure) return loadingResult
+                
+                ready()
+            }
+            else -> {
+                log.debug("从 {} 状态准备播放（通用路径）", lifecycleState.value)
+                val endedResult = ended()
+                if (endedResult.isFailure) return endedResult
+                
+                ready()
+            }
+        }
+    }
+
+    /**
+     * 从错误状态恢复
+     */
+    private suspend fun recoverFromError(): Result<Unit> {
+        val cleanupResult = cleanup()
+        cleanupResult.onFailure { log.warn("清理资源失败，继续尝试重新初始化: {}", it.message) }
+        
+        val initResult = initializeSync()
+        if (initResult.isFailure) return initResult
+        
+        val loadingResult = loading()
+        if (loadingResult.isFailure) return loadingResult
+        
+        return ready()
+    }
+
+    /**
      * 验证状态转换的合法性
      */
     private fun isValidTransition(from: PlayerLifecycleState, to: PlayerLifecycleState): Boolean {
         return when (from) {
             PlayerLifecycleState.Idle -> to in listOf(
                 PlayerLifecycleState.Initializing,
-                PlayerLifecycleState.Released,
-                PlayerLifecycleState.Initializing_Sync,
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Initializing -> to in listOf(
                 PlayerLifecycleState.Initialized,
-                PlayerLifecycleState.Error,
-                PlayerLifecycleState.Cleaning,
-                PlayerLifecycleState.Paused
+                PlayerLifecycleState.Error
             )
 
             PlayerLifecycleState.Initialized -> to in listOf(
                 PlayerLifecycleState.Loading,
-                PlayerLifecycleState.Cleaning
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Loading -> to in listOf(
                 PlayerLifecycleState.Ready,
                 PlayerLifecycleState.Error,
                 PlayerLifecycleState.Ended,
-                PlayerLifecycleState.Ended_Async,
-                PlayerLifecycleState.Cleaning
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Ready -> to in listOf(
                 PlayerLifecycleState.Playing,
                 PlayerLifecycleState.Paused,
-                PlayerLifecycleState.Cleaning
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Playing -> to in listOf(
                 PlayerLifecycleState.Paused,
                 PlayerLifecycleState.Ended,
-                PlayerLifecycleState.Ended_Async,
-                PlayerLifecycleState.Cleaning
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Paused -> to in listOf(
                 PlayerLifecycleState.Playing,
                 PlayerLifecycleState.Ended,
-                PlayerLifecycleState.Ended_Async,
-                PlayerLifecycleState.Cleaning
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Ended -> to in listOf(
                 PlayerLifecycleState.Ready,
-                PlayerLifecycleState.Cleaning
-            )
-
-            PlayerLifecycleState.Cleaning -> to in listOf(
-                PlayerLifecycleState.Initializing_Sync,
-                PlayerLifecycleState.Initialized,
-                PlayerLifecycleState.Released,
-                PlayerLifecycleState.Error
-            )
-
-            PlayerLifecycleState.Error -> to in listOf(
-                PlayerLifecycleState.Cleaning,
                 PlayerLifecycleState.Released
             )
 
-            PlayerLifecycleState.Initializing_Sync -> to in listOf(
-                PlayerLifecycleState.Error,
-                PlayerLifecycleState.Cleaning,
-                PlayerLifecycleState.Loading,
-                PlayerLifecycleState.Paused,
-                PlayerLifecycleState.Initialized
-            )
-
-            PlayerLifecycleState.Ended_Async -> to in listOf(
-                PlayerLifecycleState.Ready,
-                PlayerLifecycleState.Cleaning
+            PlayerLifecycleState.Error -> to in listOf(
+                PlayerLifecycleState.Initializing,
+                PlayerLifecycleState.Released
             )
 
             PlayerLifecycleState.Released -> to == PlayerLifecycleState.Idle

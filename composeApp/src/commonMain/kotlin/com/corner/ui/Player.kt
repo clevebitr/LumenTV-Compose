@@ -1,8 +1,11 @@
 package com.corner.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.padding
@@ -37,8 +40,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
-import com.corner.bean.PlayerStateCache
-import com.corner.bean.SettingStore
+import com.corner.util.settings.PlayerStateCache
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
 import com.corner.util.net.Utils
 import com.corner.catvodcore.viewmodel.GlobalAppState
 import com.corner.ui.nav.vm.DetailViewModel
@@ -47,6 +51,7 @@ import com.corner.ui.player.PlayerState
 import com.corner.ui.player.frame.FrameContainer
 import com.corner.ui.player.vlcj.VlcjFrameController
 import com.corner.ui.scene.Dialog
+import com.corner.ui.theme.PlayerDarkColors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
@@ -285,34 +290,53 @@ fun Player(
             exit = fadeOut()
         ) {
             DefaultControls(
-                Modifier.background(
-                    Color.Gray.copy(alpha = 0.45f), RoundedCornerShape(
-                        topStart = 4.dp,  // 顶部与父容器匹配
-                        topEnd = 4.dp,
-                        bottomStart = 4.dp, // 底部不需要圆角
-                        bottomEnd = 4.dp
-                    )
-                ).height(80.dp)
+                Modifier
+                    .height(80.dp)
                     .align(Alignment.BottomEnd), controller, vm.state.value.detail
             ) {
                 vm.clickShowEp()
             }
         }
+
+        // 迷你进度条
+        val miniProgressBarEnabled = SettingStore.getSettingItem(SettingType.MINI_PROGRESS_BAR).toBoolean()
+        if (miniProgressBarEnabled) {
+            MiniProgressBar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter),
+                controller = controller
+            )
+        }
+
         LaunchedEffect(tip.value) {
             delay(1500)
             controller.tip.emit("")
             controller.showTip.emit(false)
         }
-        AnimatedVisibility(showTip.value) {
+        AnimatedVisibility(
+            visible = showTip.value,
+            enter = slideInHorizontally(
+                initialOffsetX = { -it },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { -it },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        ) {
             Surface(
-                Modifier.padding(start = 10.dp, top = 10.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)
+                modifier = Modifier
+                    .padding(start = 16.dp, top = 16.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.7f),
+                tonalElevation = 3.dp
             ) {
                 Text(
                     tip.value,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(10.dp),
-                    fontSize = TextUnit(24f, TextUnitType.Sp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    fontSize = TextUnit(16f, TextUnitType.Sp),
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
@@ -384,5 +408,48 @@ private fun createEmptyCursor(): Cursor {
         BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB),
         Point(1, 1),
         "Empty Cursor"
+    )
+}
+
+/**
+ * 迷你进度条组件
+ */
+@Composable
+fun MiniProgressBar(
+    modifier: Modifier = Modifier,
+    controller: VlcjFrameController
+) {
+    val playerState by controller.state.collectAsState()
+    val position = playerState.timestamp
+    val duration = playerState.duration
+
+    // 计算进度百分比
+    val progress = if (duration > 0) {
+        (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    val isDarkTheme = GlobalAppState.isDarkTheme.collectAsState().value
+
+    val progressColor = if (isDarkTheme) {
+        PlayerDarkColors.primary.copy(alpha = 0.9f)
+    } else {
+        PlayerDarkColors.primary
+    }
+
+    val trackColor = if (isDarkTheme) {
+        Color.White.copy(alpha = 0.15f)
+    } else {
+        Color.Black.copy(alpha = 0.15f)
+    }
+
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = modifier
+            .fillMaxWidth()
+            .height(3.dp),
+        color = progressColor,
+        trackColor = trackColor
     )
 }

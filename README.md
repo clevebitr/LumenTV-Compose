@@ -33,6 +33,11 @@
 
 ## 核心功能
 
+### 环境要求
+- **Java 版本**: Java 8 或更高版本 (推荐 Java 17+)
+- **操作系统**: Windows 10/11, macOS, Linux
+- **VLC 播放器**: 如需使用内部播放器，请安装 VLC
+
 ### 爬虫支持
 - 本项目现在只支持 Java 爬虫，JS 和 Py 暂时没有计划，过多类型的语言现在感觉不是很有必要。编写爬虫现在还是有门槛，语言多也不会有很多人贡献代码。
 
@@ -64,6 +69,9 @@
 ### DLNA投屏支持
 - 支持 DLNA投屏功能，同时支持内部/外部播放器播放
 - 支持控制手机控制进度条/音量设置。(仅内部播放器支持)
+
+### Playewright爬虫支持
+- 支持使用 Playwright 爬虫，使用 Playwright 爬虫时，请确保已安装 Playwright。
 
 ### 平台支持
 本项目按道理支持 `win(10/11)/linux/macos`，但只在 `win` 上测试过。
@@ -105,8 +113,8 @@
 - [X] 明/暗色主题实现
 - [X] 支持广告过滤
 - [X] 自更新
+- [X] 添加playewright爬虫支持
 - [ ] 下载 aria2
-
 ## 截图
 ### 首页
 ![](readme_images/home.png)
@@ -124,14 +132,17 @@
 ### 外部播放器
 ![](readme_images/externalPlayer.png)
 ### Web播放器
-![](readme_images/M3U8Player.png)
+![](readme_images/dialog.png)
+![](readme_images/webplayer.png)
 ### 设置页
 ![](readme_images/settings_1.png)
 ![](readme_images/settings_2.png)
 ![](readme_images/settings_3.png)
 ![](readme_images/settings_4.png)
+![](readme_images/settings_5.png)
+![](readme_images/settings_6.png)
 ## 关于页
-![](readme_images/about.png)
+![](readme_images/settings_7.png)
 
 ---
 ## 引用

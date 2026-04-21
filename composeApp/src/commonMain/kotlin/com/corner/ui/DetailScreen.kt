@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,10 +47,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.WindowScope
-import com.corner.bean.SettingStore
-import com.corner.bean.SettingType
-import com.corner.bean.enums.PlayerType
-import com.corner.bean.getPlayerSetting
+import com.corner.util.settings.SettingStore
+import com.corner.util.settings.SettingType
+import com.corner.service.player.PlayerType
+import com.corner.util.settings.getPlayerSetting
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.bean.Vod.Companion.isEmpty
 import com.corner.catvodcore.bean.Episode
@@ -65,7 +66,7 @@ import com.corner.ui.nav.vm.DetailViewModel
 import com.corner.ui.scene.*
 import com.corner.ui.video.QuickSearchItem
 import com.corner.util.play.BrowserUtils
-import com.corner.util.Constants
+import com.corner.util.core.Constants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -255,9 +256,17 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 if (localShowPngDialog /*&& !DialogState.userChoseOpenInBrowser*/) {
+                    // 检测是否为磁力链接
+                    val isMagnetLink = localCurrentM3U8Url.startsWith("magnet:", ignoreCase = true)
+                    val dialogText = if (isMagnetLink) {
+                        "检测到磁力链接，是否使用 Web 播放器播放？\n（Web 播放器支持边下载边播放）"
+                    } else {
+                        "在当前播放的m3u8文件中，检测到了特殊链接，是否跳转到浏览器播放？"
+                    }
+
                     PngFoundDialog(
                         m3u8Url = localCurrentM3U8Url,
-                        text = "在当前播放的m3u8文件中，检测到了特殊链接，是否跳转到浏览器播放？",
+                        text = dialogText,
                         onDismiss = {
                             localShowPngDialog = false
                             DialogState.dismissPngDialog()
@@ -405,7 +414,7 @@ fun WindowScope.DetailScene(vm: DetailViewModel, onClickBack: () -> Unit) {
                                     verticalArrangement = Arrangement.spacedBy(24.dp)
                                 ) {
                                     // 分辨率选择
-                                    Levels(vm,urls,showUrl)
+                                    Levels(vm, urls, showUrl)
                                     // 线路选择
                                     Flags(vm)
                                     // 底部留白
@@ -986,7 +995,6 @@ fun EpisodeGrid(
                         clickedEpisodeUrl = episode.url
                         onEpisodeClick(episode)
 
-                        // 延迟清除点击状态
                         scope.launch {
                             delay(1000)
                             if (clickedEpisodeUrl == episode.url) {
@@ -1034,14 +1042,14 @@ fun EpisodeBatchSelector(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 8.dp)
             ) {
-                items((0 until epSize step Constants.EpSize).toList()) { i ->
+                items((0 until epSize step Constants.EP_SIZE).toList()) { i ->
                     RatioBtn(
-                        selected = currentTabIndex == (i / Constants.EpSize),
+                        selected = currentTabIndex == (i / Constants.EP_SIZE),
                         onClick = { onBatchClick(i) },
                         text = buildString {
                             append(i + 1)
                             append("-")
-                            append(minOf(i + Constants.EpSize, epSize))
+                            append(minOf(i + Constants.EP_SIZE, epSize))
                         },
                         modifier = Modifier.height(32.dp)
                     )
@@ -1248,12 +1256,44 @@ fun EpisodeItem(
             selected = isSelected,
             loading = actualLoadingState,
             tag = {
-                if (Utils.isDownloadLink(episode.url)) {
-                    Pair(true, "下载")
-                } else {
-                    Pair(false, "")
+                if (Utils.isDownloadLink(episode.url)){
+                    true to "下载"
+                }else{
+                    false to ""
                 }
             },
+            trailingContent = if (Utils.isDownloadLink(episode.url)) {
+                @Composable {
+                    IconButton(
+                        onClick = {
+                            try {
+                                val desktop = java.awt.Desktop.getDesktop()
+                                if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
+                                    desktop.browse(java.net.URI(episode.url))
+                                    SnackBar.postMsg("已启动下载: ${episode.name}", type = SnackBar.MessageType.INFO)
+                                }
+                            } catch (e: Exception) {
+                                log.error("下载失败", e)
+                                SnackBar.postMsg("下载失败: ${e.message}", type = SnackBar.MessageType.ERROR)
+                            }
+                        },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .padding(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "下载",
+                            tint = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            } else null,
             modifier = Modifier.height(48.dp).fillMaxWidth(),
             enableTooltip = false
         )

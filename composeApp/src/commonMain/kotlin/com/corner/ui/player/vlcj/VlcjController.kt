@@ -1,10 +1,11 @@
 package com.corner.ui.player.vlcj
 
-import com.corner.bean.PlayerStateCache
-import com.corner.bean.SettingStore
+import com.corner.util.settings.PlayerStateCache
+import com.corner.util.settings.SettingStore
 import com.corner.catvodcore.bean.Vod
 import com.corner.catvodcore.viewmodel.GlobalAppState
 import com.corner.database.entity.History
+import com.corner.service.player.PlayerOperationUtils
 import com.corner.ui.nav.vm.DetailViewModel
 import com.corner.ui.player.MediaInfo
 import com.corner.ui.player.PlayState
@@ -12,7 +13,7 @@ import com.corner.ui.player.PlayerController
 import com.corner.ui.player.PlayerLifecycleManager
 import com.corner.ui.player.PlayerState
 import com.corner.ui.scene.SnackBar
-import com.corner.util.catch
+import com.corner.util.core.catch
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.base.State
 import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
+import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 
@@ -56,7 +58,7 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
     private var playerStartTime: Long = 0
     private var playerRealStartTime: Long = 0   // 记录实际开始播放的时间
     private var playerEndTime: Long = 0
-    private val decodeFailureTureShould = 5000L  // 5秒阈值
+    private val decodeFailureTureShould = 5000L // 5秒阈值
 
     private val vlcjArgs = mutableListOf(
         "-q",                                   // 最低级别日志
@@ -152,6 +154,12 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
             }
             _state.update { it.copy(state = PlayState.PLAY) }
             log.debug("playing - 媒体开始播放")
+            
+            // Phase 6: 在播放开始时异步处理片头跳转（避免卡死）
+            scope.launch {
+                delay(300) // 等待 VLC 稳定播放
+                handleOpeningSeek()
+            }
         }
 
         override fun paused(mediaPlayer: MediaPlayer) {
@@ -193,7 +201,11 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
                 delay(500)
                 log.debug("finished:运行协程任务")
                 try {
-                    if (!vm.isLastEpisode) {
+                    // DLNA投屏时不自动换集
+                    if (vm.state.value.isDLNA) {
+                        log.info("DLNA投屏模式，跳过自动换集")
+                        SnackBar.postMsg("投屏播放完成", type = SnackBar.MessageType.INFO)
+                    } else if (!vm.isLastEpisode) {
                         log.info("切换下一集")
                         vm.nextEP() // 非最后一集才切换
                     } else {
@@ -298,29 +310,33 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         }
     }
 
-    override suspend fun cleanupAsync() = withContext(Dispatchers.IO) {
-        if (isCleaned) return@withContext
-        isCleaned = true
-        try {
-            log.debug("开始异步清理资源...")
-            player?.let { p ->
-                try {
+    override suspend fun cleanupAsync() {
+        withContext(Dispatchers.IO) {
+            if (isCleaned) return@withContext
+            isCleaned = true
+            
+            PlayerOperationUtils.safeExecute(
+                operationName = "清理资源",
+                showUserError = false
+            ) {
+                log.debug("开始异步清理资源...")
+                player?.let { p ->
                     // 使用超时控制stop操作
-                    withTimeoutOrNull(3000) { // 3秒超时
+                    PlayerOperationUtils.safeExecute(
+                        operationName = "停止播放",
+                        showUserError = false,
+                        timeoutMillis = 3000L
+                    ) {
                         p.controls()?.stop()
-                    } ?: run {
-                        log.warn("停止播放超时，继续执行资源清理...")
+                    }.onFailure {
+                        log.warn("停止播放失败或超时，继续执行资源清理")
                     }
-                } catch (e: Exception) {
-                    log.warn("停止播放时出错，继续执行资源清理", e)
                 }
+                // 取消scope和清理其他资源
+                scope.cancel("异步停止播放")
+                deferredEffects.clear()
+                log.debug("异步清理资源完成!")
             }
-            // 取消scope和清理其他资源
-            scope.cancel("异步停止播放")
-            deferredEffects.clear()
-            log.debug("异步清理资源完成!")
-        } catch (e: Exception) {
-            log.warn("异步清理资源异常: ${e.message}")
         }
     }
 
@@ -361,14 +377,16 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         }
 
         endingHandled = false
-        try {
-            val optionsList =
-                mutableListOf("http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0")
+        
+        val result = PlayerOperationUtils.safeExecute(
+            operationName = "加载媒体",
+            timeoutMillis = timeoutMillis
+        ) {
+            val optionsList = mutableListOf("http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0")
 
             // 添加空指针检查
             if (player?.media() == null) {
-                log.error("播放器媒体对象为空!")
-                return@withContext this@VlcjController
+                throw IllegalStateException("播放器媒体对象为空!")
             }
 
             log.info("设置媒体：$url")
@@ -376,25 +394,10 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
             // 设置加载状态
             playerLoading = true
             player?.media()?.prepare(url, *optionsList.toTypedArray())
-
-        } catch (e: TimeoutCancellationException) {
+        }
+        
+        if (result.isFailure) {
             playerLoading = false
-            log.error("媒体加载超时: ${e.message}")
-            withContext(Dispatchers.Swing) {
-                SnackBar.postMsg("媒体加载超时，请检查网络连接", type = SnackBar.MessageType.WARNING)
-            }
-        } catch (e: Error) {
-            playerLoading = false
-            log.error("媒体加载失败:", e)
-            withContext(Dispatchers.Swing) {
-                SnackBar.postMsg("媒体加载失败: ${e.message}", type = SnackBar.MessageType.ERROR)
-            }
-        } catch (e: Exception) {
-            playerLoading = false
-            log.error("媒体加载异常:", e)
-            withContext(Dispatchers.Swing) {
-                SnackBar.postMsg("媒体加载异常: ${e.message}", type = SnackBar.MessageType.ERROR)
-            }
         }
 
         this@VlcjController
@@ -402,6 +405,38 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
 
 
     private val stateList = listOf(State.ENDED, State.ERROR)
+    
+    /**
+     * 处理片头跳转（在 playing 回调中调用）
+     */
+    private fun handleOpeningSeek() {
+        try {
+            val position = history.value?.position ?: 0L
+            val opening = _state.value.opening
+            
+            // 只有当 opening 有效且大于当前时间时才跳转
+            if (opening != null && opening != -1L && opening > 0) {
+                val seekPosition = max(position, opening)
+                val currentTime = player?.status()?.time() ?: 0L
+                
+                log.debug("handleOpeningSeek - position=$position, opening=$opening, seekPosition=$seekPosition, currentTime=$currentTime")
+                
+                // 如果当前位置小于片头位置，才执行跳转
+                if (currentTime < seekPosition) {
+                    log.info("跳转到片头位置: $seekPosition ms")
+                    player?.controls()?.setTime(seekPosition)
+                    _state.update { it.copy(timestamp = seekPosition) }
+                } else {
+                    log.debug("当前位置已跳过片头，无需跳转")
+                }
+            } else {
+                log.debug("未设置片头标记或片头标记无效")
+            }
+        } catch (e: Exception) {
+            log.error("处理片头跳转失败", e)
+        }
+    }
+    
     override fun play() {
         catch {
             showTips("播放")
@@ -448,18 +483,20 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         player?.controls()?.stop()
     }
 
-    override suspend fun stopAsync() = withContext(Dispatchers.IO) {
-        log.debug("异步停止播放...")
-        showTips("停止")
-        try {
-            // 使用超时控制stop操作
-            withTimeoutOrNull(3000) { // 3秒超时
+    override suspend fun stopAsync() {
+        withContext(Dispatchers.IO) {
+            log.debug("异步停止播放...")
+            showTips("停止")
+            
+            PlayerOperationUtils.safeExecute(
+                operationName = "停止播放",
+                showUserError = false,
+                timeoutMillis = 3000L
+            ) {
                 player?.controls()?.stop()
-            } ?: run {
-                log.warn("停止播放超时")
+            }.onFailure {
+                log.warn("停止播放失败或超时")
             }
-        } catch (e: Exception) {
-            log.warn("停止播放时出错:", e)
         }
     }
 
@@ -469,7 +506,10 @@ class VlcjController(val vm: DetailViewModel) : PlayerController {
         deferredEffects.clear()
         player?.events()?.removeMediaPlayerEventListener(stateListener)
         player?.release()
-        factory.release()
+        // 只有当 factory 已初始化时才释放
+        if (::factory.isInitialized) {
+            factory.release()
+        }
         player = null
         log.debug("dispose - 释放成功")
     }
