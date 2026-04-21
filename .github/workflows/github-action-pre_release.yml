@@ -62,7 +62,7 @@ jobs:
       - name: 👀 Look Work Dir(After)
         run: dir ./
       - name: 📤 Upload Windows artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: win-file
           path: |
@@ -111,7 +111,8 @@ jobs:
           # 创建并移动 ZIP 文件
           appPath="./composeApp/build/compose/binaries/main-release/app/LumenTV"
           if [ -d "$appPath" ]; then
-            zip -q -r "${{ github.workspace }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip" "$appPath"
+            cd "$appPath"
+            zip -q -r "${{ github.workspace }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip" ./LumenTV
             echo "✅ Linux ZIP 包已创建"
           else
             echo "❌ 应用目录不存在: $appPath"
@@ -120,7 +121,7 @@ jobs:
       - name: 👀 Look Work Dir(After)
         run: ls
       - name: 📤 Upload Linux artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: linux-file
           path: |
@@ -170,7 +171,8 @@ jobs:
           # 创建并移动 ZIP 文件
           appPath="./composeApp/build/compose/binaries/main-release/app"
           if [ -d "$appPath" ]; then
-            zip -q -r "${{ github.workspace }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$appPath"
+            cd "$appPath"
+            zip -q -r "${{ github.workspace }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" ./*.app
             echo "✅ macOS ZIP 包已创建"
           else
             echo "❌ 应用目录不存在: $appPath"
@@ -179,7 +181,7 @@ jobs:
       - name: 👀 Look Work Dir(After)
         run: ls
       - name: 📤 Upload macOS artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: mac-file
           path: |
@@ -193,7 +195,7 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v5
       - name: 📥 Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
       - name: 📋 Organize files for release
         run: |
           echo "📂 整理发布文件"
