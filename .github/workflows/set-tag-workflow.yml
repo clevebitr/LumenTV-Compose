@@ -11,35 +11,31 @@ on:
 
 jobs:
   set-tag:
-    name: set-tag
+    name: 🏷️ set-tag
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set-version.outputs.tag }}
       lastTag: ${{ steps.get-last-tag.outputs.lastTag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      # 获取最新标签
       - id: get-latest-tag
         run: |
           LATEST_TAG=$(git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
           
-          # 如果没有找到匹配的标签，使用默认值
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="v0.0.1"
           fi
           
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
 
-      # 获取上一个标签
       - id: get-last-tag
         run: |
           LAST_TAG=$(git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
           echo "lastTag=$LAST_TAG" >> $GITHUB_OUTPUT
 
-      # 统一版本号生成逻辑
       - id: set-version
         run: |
           if [ "${{ github.ref }}" == "refs/heads/pre-release" ]; then

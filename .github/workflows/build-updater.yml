@@ -1,6 +1,5 @@
 name: Build Updater
 
-# 仅作为可复用工作流，不自动触发
 on:
   workflow_call:
     inputs:
@@ -47,24 +46,24 @@ jobs:
             artifact_suffix: macos-arm64
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: ⬇️Checkout code
+        uses: actions/checkout@v5
 
-      - name: Set up Go
+      - name: 🔨Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
           cache: false
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
+      - name: 🔨Cache Go modules
+        uses: actions/cache@v5
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('updater/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
+      - name: 🏗️Build updater for ${{ matrix.goos }}/${{ matrix.goarch }}
         working-directory: ./updater
         shell: bash
         run: |
@@ -74,8 +73,8 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
 
-      - name: Upload updater artifact
-        uses: actions/upload-artifact@v4
+      - name: ⬆️Upload updater artifact
+        uses: actions/upload-artifact@v5
         with:
           name: updater-${{ matrix.artifact_suffix }}
           path: ./updater/${{ matrix.binary_name }}

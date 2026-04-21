@@ -18,24 +18,31 @@ jobs:
     needs: [set-tag, build-updater]
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: ☕ Set up Java
-        uses: actions/setup-java@v4
+      - name: ☕ Set up Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - run: echo ${{needs.set-tag.outputs.tag}}
-      - run: ls
-      - run: ./gradlew packageReleaseDistributionForCurrentOS
-      - run: ./gradlew createReleaseDistributable
-      - run: tree /f ./composeApp/build
-      - run: ls && tree ./desktopApp /f
-      - name: compress
-        shell: pwsh
-        run: Compress-Archive -Path "./composeApp/build/compose/binaries/main-release/app/LumenTV" -DestinationPath ./LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip
-      - name: move result to root
+
+      - name: 🆕 New Tag is ${{needs.set-tag.outputs.tag}}
+        run: echo ${{needs.set-tag.outputs.tag}}
+
+      - name: 👀 Loos Work Dir(Before)
+        run: dir
+
+      - name: 🪟 Build LumenTV Windows Release(packageReleaseDistributionForCurrentOS)
+        run: ./gradlew packageReleaseDistributionForCurrentOS
+
+      - name: 🪟 Build LumenTV Windows Release(createReleaseDistributable)
+        run: ./gradlew createReleaseDistributable
+
+      - name: 👀 Check Build
+        run: tree /f ./composeApp/build/compose/binaries/main-release
+
+      - name: 📦 Package Windows application
         shell: pwsh
         run: |
           # 移动 MSI 文件到根目录
@@ -43,7 +50,7 @@ jobs:
           if (Test-Path $msiPath) {
             Get-ChildItem -Path $msiPath -Filter "*.msi" | ForEach-Object {
               $newName = "LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi"
-              Move-Item $_.FullName "./$newName" -Force
+              Move-Item $_.FullName "${{ github.workspace }}/$newName" -Force
               Write-Host "✅ MSI 文件已移动并重命名: $newName"
             }
           } else {
@@ -54,15 +61,17 @@ jobs:
           $appPath = "./composeApp/build/compose/binaries/main-release/app/LumenTV"
           if (Test-Path $appPath) {
             $zipName = "LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip"
-            Compress-Archive -Path "$appPath" -DestinationPath "./$zipName" -Force
+            Compress-Archive -Path "$appPath" -DestinationPath "${{ github.workspace }}/$zipName" -Force
             Write-Host "✅ Windows ZIP 包已创建: $zipName"
           } else {
             Write-Host "❌ 应用目录不存在: $appPath"
             exit 1
           }
 
+      - name: 👀 Loos Work Dir(After)
+        run: dir
       - name: 📤 Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: win-file
           path: |
@@ -74,24 +83,54 @@ jobs:
     needs: [set-tag, build-updater]
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: ☕ Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - run: ls
-      - run: chmod +x ./gradlew && ./gradlew createReleaseDistributable
-      - run: ./gradlew packageReleaseDistributionForCurrentOS
-      - run: ls && tree
-      - name: compress
-        run: cd ./composeApp/build/compose/binaries/main-release/app && zip -q -r ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip ./LumenTV
-      - name: move file
-        run: mv ./composeApp/build/compose/binaries/main-release/deb/*.deb ./LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb && mv ./composeApp/build/compose/binaries/main-release/app/*.zip ./
-      - run: ls
-      - uses: actions/upload-artifact@v4
+      - name: 🆕 New Tag is ${{needs.set-tag.outputs.tag}}
+        run: echo ${{needs.set-tag.outputs.tag}}
+      - name: 👀 Loos Work Dir(Before)
+        run: ls
+      - name: 🐧 Build LumenTV Linux Release(createReleaseDistributable)
+        run: chmod +x ./gradlew && ./gradlew createReleaseDistributable
+      - name: 🐧 Build LumenTV Linux Release(packageReleaseDistributionForCurrentOS)
+        run: ./gradlew packageReleaseDistributionForCurrentOS
+      - name: 👀 Check Build
+        run: tree ./composeApp/build/compose/binaries/main-release
+      - name: 📦 Package Linux application
+        shell: bash
+        run: |
+          # 移动 DEB 文件到根目录
+          debPath="./composeApp/build/compose/binaries/main-release/deb"
+          if [ -d "$debPath" ]; then
+            for file in "$debPath"/*.deb; do
+              if [ -f "$file" ]; then
+                newName="LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb"
+                mv "$file" "${{ github.workspace }}/$newName"
+                echo "✅ DEB 文件已移动并重命名: $newName"
+              fi
+            done
+          else
+            echo "⚠️  DEB 目录不存在: $debPath"
+          fi
+
+          # 创建并移动 ZIP 文件
+          appPath="./composeApp/build/compose/binaries/main-release/app/LumenTV"
+          if [ -d "$appPath" ]; then
+            zip -q -r "${{ github.workspace }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip" "$appPath"
+            echo "✅ Linux ZIP 包已创建"
+          else
+            echo "❌ 应用目录不存在: $appPath"
+            exit 1
+          fi
+      - name: 👀 Look Work Dir(After)
+        run: ls
+      - name: 📤 Upload Linux artifacts
+        uses: actions/upload-artifact@v5
         with:
           name: linux-file
           path: |
@@ -103,24 +142,54 @@ jobs:
     needs: [set-tag, build-updater]
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: ☕ Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
           cache: 'gradle'
-      - run: ls
-      - run: chmod +x ./gradlew && ./gradlew createReleaseDistributable
-      - run: ./gradlew packageReleaseDistributionForCurrentOS
-      - run: ls
-      - name: compress
-        run: zip -q -r ./TV-mac-${{ needs.set-tag.outputs.tag }}.zip ./composeApp/build/compose/binaries/main-release/app
-      - name: move file
-        run: mv ./composeApp/build/compose/binaries/main-release/dmg/*.dmg ./LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg
-      - run: ls
-      - uses: actions/upload-artifact@v4
+      - name: 🆕 New Tag is ${{needs.set-tag.outputs.tag}}
+        run: echo ${{needs.set-tag.outputs.tag}}
+      - name: 👀 Look Work Dir(Before)
+        run: ls
+      - name: 🍎 Build LumenTV macOS Release(createReleaseDistributable)
+        run: chmod +x ./gradlew && ./gradlew createReleaseDistributable
+      - name: 🍎  Build LumenTV macOS Release(packageReleaseDistributionForCurrentOS)
+        run: ./gradlew packageReleaseDistributionForCurrentOS
+      - name: 👀 Check Build
+        run: ls -R ./composeApp/build/compose/binaries/main-release
+      - name: 📦 Package macOS application
+        shell: bash
+        run: |
+          # 移动 DMG 文件到根目录
+          dmgPath="./composeApp/build/compose/binaries/main-release/dmg"
+          if [ -d "$dmgPath" ]; then
+            for file in "$dmgPath"/*.dmg; do
+              if [ -f "$file" ]; then
+                newName="LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg"
+                mv "$file" "${{ github.workspace }}/$newName"
+                echo "✅ DMG 文件已移动并重命名: $newName"
+              fi
+            done
+          else
+            echo "⚠️  DMG 目录不存在: $dmgPath"
+          fi
+          
+          # 创建并移动 ZIP 文件
+          appPath="./composeApp/build/compose/binaries/main-release/app"
+          if [ -d "$appPath" ]; then
+            zip -q -r "${{ github.workspace }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip" "$appPath"
+            echo "✅ macOS ZIP 包已创建"
+          else
+            echo "❌ 应用目录不存在: $appPath"
+            exit 1
+          fi
+      - name: 👀 Look Work Dir(After)
+        run: ls
+      - name: 📤 Upload macOS artifacts
+        uses: actions/upload-artifact@v5
         with:
           name: mac-file
           path: |
@@ -132,10 +201,10 @@ jobs:
     needs: [ build-win, build-linux, build-mac, set-tag, build-updater ]
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 📥 Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
 
       - name: 📋 Organize files for release
         run: |
@@ -177,7 +246,7 @@ jobs:
         run: |
           echo "📖 从 CHANGELOG.md 提取 ${{ needs.set-tag.outputs.tag }} 的更新日志"
           
-          # 去除版本号前缀的 'v' (CHANGELOG 中使用 v1.1.6 格式)
+          # 去除版本号前缀的 'v'
           VERSION_WITH_V="${{ needs.set-tag.outputs.tag }}"
           
           # 使用 awk 提取对应版本的更新日志
@@ -207,14 +276,13 @@ jobs:
           echo "✅ 提取到的更新日志:"
           echo "$CHANGELOG"
           
-          # 将多行内容保存到环境变量（使用 GitHub Actions 的多行语法）
-          # 注意：需要对内容进行转义，避免 YAML 解析错误
+          # 将多行内容保存到环境变量
           echo "changelog<<CHANGELOG_EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "CHANGELOG_EOF" >> $GITHUB_OUTPUT
 
       - name: 🚀 Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./release-files/*
           tag_name: ${{ needs.set-tag.outputs.tag }}
