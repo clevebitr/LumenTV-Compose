@@ -109,8 +109,8 @@ jobs:
           fi
 
           # 创建并移动 ZIP 文件
-          appPath="./composeApp/build/compose/binaries/main-release/app/LumenTV"
-          if [ -d "$appPath" ]; then
+          appPath="./composeApp/build/compose/binaries/main-release/app"
+          if [ -d "$appPath/LumenTV" ]; then
             cd "$appPath"
             zip -q -r "${{ github.workspace }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip" ./LumenTV
             echo "✅ Linux ZIP 包已创建"
