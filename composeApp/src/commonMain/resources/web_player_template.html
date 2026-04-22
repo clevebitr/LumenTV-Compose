@@ -1300,13 +1300,19 @@
                 this.hls = new Hls({
                     enableWorker: false,
                     lowLatencyMode: true,
-                    backBufferLength: 90
+                    backBufferLength: 90,
+                    // 添加编解码器兼容性选项
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 600,
+                    startLevel: -1, // 自动选择最佳质量级别
+                    capLevelToPlayerSize: true // 根据播放器尺寸限制质量
                 });
                 
                 this.hls.loadSource(url);
                 this.hls.attachMedia(this.elements.video);
                 
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('[HLS] Manifest 解析成功');
                     this.hideLoading();
                     this.elements.video.play().catch(err => {
                         console.warn('HLS自动播放被阻止:', err);
@@ -1314,30 +1320,170 @@
                 });
                 
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
-                    console.error('HLS错误:', data);
+                    console.error('[HLS] 错误详情:', data);
+                    
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.warn('[HLS] 网络错误，尝试恢复...');
                                 this.hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                this.hls.recoverMediaError();
+                                console.warn('[HLS] 媒体错误，尝试恢复...');
+                                this.handleMediaError(data);
                                 break;
                             default:
+                                console.error('[HLS] 致命错误，无法恢复');
                                 this.hls.destroy();
-                                this.showError('HLS播放失败');
+                                this.showError('HLS播放失败: ' + (data.details || '未知错误'));
                                 break;
                         }
+                    } else {
+                        console.warn('[HLS] 非致命警告:', data.details);
                     }
                 });
             }
             
+            handleMediaError(data) {
+                console.log('[HLS] 处理媒体错误:', data.details);
+                
+                // 检查是否是编解码器相关错误
+                const isCodecError = data.details && (
+                    data.details.includes('bufferAddCodecError') ||
+                    data.details.includes('bufferAppendError') ||
+                    data.details.includes('fragParsingError')
+                );
+                
+                if (isCodecError) {
+                    console.warn('[HLS] 检测到编解码器兼容性问题，尝试降级策略...');
+                    
+                    // 尝试切换到不同的质量级别
+                    const levels = this.hls.levels;
+                    if (levels && levels.length > 1) {
+                        // 选择较低的质量级别
+                        const lowerLevel = Math.max(0, this.hls.currentLevel - 1);
+                        console.log(`[HLS] 切换到质量级别 ${lowerLevel}`);
+                        this.hls.nextLevel = lowerLevel;
+                    }
+                    
+                    // 尝试恢复媒体错误
+                    setTimeout(() => {
+                        this.hls.recoverMediaError();
+                    }, 1000);
+                } else {
+                    // 其他媒体错误，使用标准恢复
+                    this.hls.recoverMediaError();
+                }
+            }
+            
             async playNormal(url) {
+                console.log('[Video] 尝试播放普通视频:', url);
+                
+                // 检测视频格式并检查浏览器支持
+                const videoType = this.detectVideoType(url);
+                const isSupported = this.checkVideoSupport(videoType, url);
+                
+                if (!isSupported.supported) {
+                    console.warn('[Video] 浏览器可能不支持此视频格式:', isSupported.message);
+                    // 仍然尝试播放，但给用户提示
+                    this.showCodecWarning(isSupported.message);
+                }
+                
                 this.elements.video.src = url;
                 
                 this.elements.video.play().catch(err => {
-                    console.warn('自动播放被阻止:', err.message);
+                    console.warn('[Video] 自动播放被阻止:', err.message);
+                    
+                    // 如果是解码错误，提供额外建议
+                    if (err.name === 'NotSupportedError' || err.name === 'NotAllowedError') {
+                        this.suggestCodecWorkaround();
+                    }
                 });
+            }
+            
+            checkVideoSupport(videoType, url) {
+                const video = document.createElement('video');
+                
+                // 检查常见的 MIME 类型
+                const mimeTypes = {
+                    'mp4': [
+                        'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+                        'video/mp4; codecs="avc1.4d4029"',
+                        'video/mp4'
+                    ],
+                    'webm': ['video/webm; codecs="vp8, vorbis"', 'video/webm'],
+                    'mkv': ['video/x-matroska'],
+                    'flv': ['video/x-flv'],
+                    'avi': ['video/x-msvideo']
+                };
+                
+                const typesToCheck = mimeTypes[videoType] || [];
+                
+                for (const mimeType of typesToCheck) {
+                    const support = video.canPlayType(mimeType);
+                    if (support === 'probably' || support === 'maybe') {
+                        console.log(`[Video] 支持格式: ${mimeType} (${support})`);
+                        return { supported: true, mimeType };
+                    }
+                }
+                
+                // 如果没有明确的编解码器信息，返回基本信息
+                return {
+                    supported: false,
+                    message: `浏览器可能不支持 ${videoType.toUpperCase()} 格式或该编解码器配置`
+                };
+            }
+            
+            showCodecWarning(message) {
+                console.warn('[Video] 编解码器警告:', message);
+                
+                // 创建一个临时的警告提示
+                const warningDiv = document.createElement('div');
+                warningDiv.style.cssText = `
+                    position: absolute;
+                    top: 80px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(255, 165, 0, 0.9);
+                    color: #000;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    z-index: 150;
+                    max-width: 80%;
+                    text-align: center;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    animation: fadeInOut 4s ease-in-out;
+                `;
+                warningDiv.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 4px;">⚠️ 兼容性警告</div>
+                    <div>${message}</div>
+                    <div style="margin-top: 8px; font-size: 11px; opacity: 0.8;">如果播放失败，请查看控制台获取解决方案</div>
+                `;
+                
+                // 添加动画样式
+                if (!document.getElementById('warning-animation-style')) {
+                    const style = document.createElement('style');
+                    style.id = 'warning-animation-style';
+                    style.textContent = `
+                        @keyframes fadeInOut {
+                            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+                
+                document.querySelector('.player-wrapper').appendChild(warningDiv);
+                
+                // 4秒后移除警告
+                setTimeout(() => {
+                    if (warningDiv.parentNode) {
+                        warningDiv.parentNode.removeChild(warningDiv);
+                    }
+                }, 4000);
             }
             
             async playMagnet(magnetUrl) {
@@ -1632,8 +1778,106 @@
             }
             
             onError(e) {
-                console.error('播放器错误:', e);
-                this.showError('视频播放失败');
+                console.error('[Video] 播放器错误事件:', e);
+                
+                const video = this.elements.video;
+                const error = video.error;
+                
+                if (error) {
+                    console.error('[Video] 错误代码:', error.code);
+                    console.error('[Video] 错误消息:', error.message);
+                    
+                    let errorMessage = '视频播放失败';
+                    
+                    switch(error.code) {
+                        case MediaError.MEDIA_ERR_ABORTED:
+                            errorMessage = '视频播放被中止';
+                            break;
+                        case MediaError.MEDIA_ERR_NETWORK:
+                            errorMessage = '网络错误导致视频加载失败';
+                            break;
+                        case MediaError.MEDIA_ERR_DECODE:
+                            errorMessage = '视频解码错误，可能是编解码器不兼容';
+                            this.suggestCodecWorkaround();
+                            break;
+                        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage = '视频格式不受支持';
+                            this.suggestCodecWorkaround();
+                            break;
+                        default:
+                            errorMessage = '未知播放错误';
+                    }
+                    
+                    this.showError(errorMessage);
+                } else {
+                    this.showError('视频播放失败');
+                }
+            }
+            
+            suggestCodecWorkaround() {
+                console.log('[Video] 提供编解码器兼容性建议');
+                
+                // 检测操作系统
+                const platform = navigator.platform.toLowerCase();
+                const userAgent = navigator.userAgent.toLowerCase();
+                
+                const isLinux = platform.includes('linux') || userAgent.includes('linux');
+                const isFirefox = userAgent.includes('firefox');
+                const isChrome = userAgent.includes('chrome') && !userAgent.includes('chromium');
+                
+                let suggestion = '';
+                
+                if (isLinux) {
+                    suggestion = '💡 Linux 系统提示:\n\n';
+                    
+                    if (isFirefox) {
+                        suggestion += 'Firefox 在 Linux 上可能需要安装额外的编解码器包。\n\n';
+                        suggestion += '请尝试以下解决方案:\n';
+                        suggestion += '1. 安装 GStreamer 插件:\n';
+                        suggestion += '   sudo apt install gstreamer1.0-libav gstreamer1.0-plugins-bad\n\n';
+                        suggestion += '2. 或者安装 FFmpeg:\n';
+                        suggestion += '   sudo apt install ffmpeg\n\n';
+                        suggestion += '3. 尝试使用 Chrome/Chromium 浏览器';
+                    } else if (isChrome) {
+                        suggestion += 'Chrome 在 Linux 上通常支持 H.264，但可能需要安装编解码器。\n\n';
+                        suggestion += '请尝试:\n';
+                        suggestion += 'sudo apt install chromium-codecs-ffmpeg-extra\n\n';
+                        suggestion += '或者使用系统自带的 VLC 播放器';
+                    } else {
+                        suggestion += '您的浏览器可能缺少必要的视频编解码器。\n\n';
+                        suggestion += '建议:\n';
+                        suggestion += '1. 安装系统编解码器包\n';
+                        suggestion += '2. 尝试使用 Firefox 或 Chrome 浏览器\n';
+                        suggestion += '3. 使用外部播放器（VLC/MPV）';
+                    }
+                } else {
+                    suggestion = '💡 建议:\n\n';
+                    suggestion += '1. 尝试刷新页面重新加载\n';
+                    suggestion += '2. 清除浏览器缓存后重试\n';
+                    suggestion += '3. 尝试使用其他浏览器\n';
+                    suggestion += '4. 使用外部播放器播放';
+                }
+                
+                console.log(suggestion);
+                
+                // 在错误消息后显示建议（延迟显示，避免覆盖错误消息）
+                setTimeout(() => {
+                    const errorOverlay = document.querySelector('.error-overlay');
+                    if (errorOverlay) {
+                        const suggestionDiv = document.createElement('div');
+                        suggestionDiv.style.cssText = `
+                            margin-top: 16px;
+                            padding-top: 16px;
+                            border-top: 1px solid rgba(255,255,255,0.3);
+                            font-size: 12px;
+                            line-height: 1.6;
+                            white-space: pre-line;
+                            text-align: left;
+                        `;
+                        suggestionDiv.textContent = suggestion;
+                        errorOverlay.appendChild(suggestionDiv);
+                    }
+                }, 500);
             }
             
             toggleFullscreen() {

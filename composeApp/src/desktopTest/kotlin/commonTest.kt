@@ -202,6 +202,76 @@ class commonTest {
         println(convert)
     }
 
+    @Test fun urlResolve_Linux(){
+        // 测试Linux系统下的相对路径解析
+        var convert1: String = Urls.convert(
+            "file:///home/rocky/爬虫/json/config.json",
+            "./alist.json"
+        )
+        println("Linux相对路径解析: $convert1")
+        assert(convert1 == "/home/rocky/爬虫/json/alist.json") { "路径解析错误: $convert1" }
+        
+        // 测试上级目录
+        var convert2: String = Urls.convert(
+            "file:///home/rocky/爬虫/json/config.json",
+            "../jar/spider.jar"
+        )
+        println("Linux上级目录解析: $convert2")
+        assert(convert2 == "/home/rocky/爬虫/jar/spider.jar") { "路径解析错误: $convert2" }
+    }
+
+    @Test fun urlResolve_Windows(){
+        // 测试Windows系统下的相对路径解析
+        var convert1: String = Urls.convert(
+            "file:///C:/Users/xiaol/Downloads/爬虫/json/config.json",
+            "./alist.json"
+        )
+        println("Windows相对路径解析: $convert1")
+        assert(convert1 == "C:/Users/xiaol/Downloads/爬虫/json/alist.json") { "路径解析错误: $convert1" }
+        
+        // 测试上级目录
+        var convert2: String = Urls.convert(
+            "file:///C:/Users/xiaol/Downloads/爬虫/json/config.json",
+            "../jar/spider.jar"
+        )
+        println("Windows上级目录解析: $convert2")
+        assert(convert2 == "C:/Users/xiaol/Downloads/爬虫/jar/spider.jar") { "路径解析错误: $convert2" }
+        
+        // 测试反斜杠输入(自动转换为正斜杠)
+        var convert3: String = Urls.convert(
+            "file://C:\\Users\\xiaol\\Downloads\\爬虫\\json\\config.json",
+            "..\\jar\\spider.jar"
+        )
+        println("Windows反斜杠解析: $convert3")
+        assert(convert3 == "C:/Users/xiaol/Downloads/爬虫/jar/spider.jar") { "路径解析错误: $convert3" }
+    }
+
+    @Test fun urlResolve_macOS(){
+        // 测试macOS系统下的相对路径解析
+        var convert1: String = Urls.convert(
+            "file:///Users/xiaol/Downloads/爬虫/json/config.json",
+            "./alist.json"
+        )
+        println("macOS相对路径解析: $convert1")
+        assert(convert1 == "/Users/xiaol/Downloads/爬虫/json/alist.json") { "路径解析错误: $convert1" }
+        
+        // 测试上级目录
+        var convert2: String = Urls.convert(
+            "file:///Users/xiaol/Downloads/爬虫/json/config.json",
+            "../jar/spider.jar"
+        )
+        println("macOS上级目录解析: $convert2")
+        assert(convert2 == "/Users/xiaol/Downloads/爬虫/jar/spider.jar") { "路径解析错误: $convert2" }
+        
+        // 测试Applications目录
+        var convert3: String = Urls.convert(
+            "file:///Applications/LumenTV.app/Contents/Resources/config.json",
+            "../libs/player.dylib"
+        )
+        println("macOS Applications目录解析: $convert3")
+        assert(convert3 == "/Applications/LumenTV.app/Contents/libs/player.dylib") { "路径解析错误: $convert3" }
+    }
+
     @Test
     fun osTest(){
         println(SystemUtil.getOsInfo().version)

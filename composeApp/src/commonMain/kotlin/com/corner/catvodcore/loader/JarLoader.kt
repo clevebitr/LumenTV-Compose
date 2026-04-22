@@ -101,8 +101,16 @@ object JarLoader {
                         load(key, download(jar))
                         return
                     }
+                    
+                    // Windows/Linux/macOS绝对路径，直接作为文件加载
+                    jar.matches(Regex("^[A-Za-z]:[/\\\\].*")) || jar.startsWith("/") -> {
+                        log.info("检测到绝对路径，以文件方式加载: $jar")
+                        load(key, File(jar))
+                        return
+                    }
 
                     else -> {
+                        // 相对路径，需要解析
                         currentProcessedUrl = parseJarUrl(jar)
                         if (currentProcessedUrl == jar) {
                             if (currentRetryCount < MAX_RETRY_COUNT) {
@@ -146,7 +154,14 @@ object JarLoader {
      * 如果在配置文件种使用的相对路径， 下载的时候使用的全路径 如果判断的md5是否一致的时候使用相对路径 就会造成重复下载
      */
     private fun parseJarUrl(jar: String): String {
+        // 已经是完整URL或绝对路径，直接返回
         if (jar.startsWith("file") || jar.startsWith("http")) return jar
+        // Windows绝对路径 (C:/... 或 C:\...)
+        if (jar.matches(Regex("^[A-Za-z]:[/\\\\].*"))) return jar
+        // Linux/macOS绝对路径 (/...)
+        if (jar.startsWith("/")) return jar
+        
+        // 相对路径，需要基于baseUrl解析
         return Urls.convert(ApiConfig.api.url!!, jar)
     }
 
@@ -228,9 +243,7 @@ object JarLoader {
             // 网络连接错误，通常是代理问题
             log.error("加载Spider时网络连接失败: key={}, api={}", key, api, e)
             SnackBar.postMsg(
-                "爬虫加载失败：无法连接到网络\n\n可能原因：\n1. 代理服务器未启动（当前配置: ${
-                    SettingStore.getSettingItem(
-                        SettingType.PROXY)}）\n2. 网络连接异常\n3. 目标服务器不可达\n\n建议：检查代理设置或关闭代理后重试",
+                "爬虫加载失败：无法连接到网络\n\n可能原因：\n1. 代理服务器未启动（当前配置: ${SettingStore.getSettingItem(SettingType.PROXY)}）\n2. 网络连接异常\n3. 目标服务器不可达\n\n建议：检查代理设置或关闭代理后重试",
                 type = SnackBar.MessageType.ERROR
             )
             return Spider()
