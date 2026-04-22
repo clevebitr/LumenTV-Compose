@@ -181,7 +181,7 @@ compose.desktop {
         // jvmArgs("--enable-native-access=ALL-UNNAMED")
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "LumenTV"
             packageVersion = libs.versions.app.version.get()
             vendor = "LumenTV Compose"

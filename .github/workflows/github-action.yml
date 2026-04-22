@@ -117,6 +117,20 @@ jobs:
           else
             echo "⚠️  DEB 目录不存在: $debPath"
           fi
+          
+          # 移动 RPM 文件到根目录
+          rpmPath="./composeApp/build/compose/binaries/main-release/rpm"
+          if [ -d "$rpmPath" ]; then
+            for file in "$rpmPath"/*.rpm; do
+              if [ -f "$file" ]; then
+                newName="LumenTV-linux-${{ needs.set-tag.outputs.tag }}.rpm"
+                mv "$file" "${{ github.workspace }}/$newName"
+                echo "✅ RPM 文件已移动并重命名: $newName"
+              fi
+            done
+          else
+            echo "⚠️  RPM 目录不存在: $rpmPath"
+          fi
 
           # 创建并移动 ZIP 文件
           appPath="./composeApp/build/compose/binaries/main-release/app"
@@ -136,6 +150,7 @@ jobs:
           name: linux-file
           path: |
             *.deb
+            *.rpm
             *.zip
 
   build-mac:
@@ -300,7 +315,7 @@ jobs:
             
             ### 📦 包含文件
             - **Windows**: MSI 安装包和 ZIP 压缩包
-            - **Linux**: DEB 包和 ZIP 压缩包  
+            - **Linux**: DEB 包、RPM 包和 ZIP 压缩包  
             - **macOS**: DMG 镜像和 ZIP 压缩包
             - **Updater**: 各平台独立的更新器组件
             - **version.json**: 版本信息文件
@@ -310,7 +325,8 @@ jobs:
             | 平台 | 安装包 | 压缩包 |
             |------|--------|--------|
             | Windows | [MSI](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.msi) | [ZIP](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-win-${{ needs.set-tag.outputs.tag }}.zip) |
-            | Linux | [DEB](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb) | [ZIP](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip) |
+            | Linux (Debian/Ubuntu) | [DEB](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.deb) | [ZIP](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip) |
+            | Linux (RedHat/CentOS/Fedora) | [RPM](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.rpm) | [ZIP](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-linux-${{ needs.set-tag.outputs.tag }}.zip) |
             | macOS | [DMG](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.dmg) | [ZIP](https://github.com/${{ github.repository }}/releases/download/${{ needs.set-tag.outputs.tag }}/LumenTV-mac-${{ needs.set-tag.outputs.tag }}.zip) |
             
             > 💡 提示：完整的历史更新记录请查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
